@@ -6,7 +6,10 @@ import {
   TEAM_MEMBERS,
   type InvalidField,
   type ProjectFormState,
+  type TeamMember,
 } from "../lib/projects";
+
+type TextField = "name" | "client" | "desc" | "deadline" | "priority";
 
 type ProjectFormModalProps = {
   isOpen: boolean;
@@ -15,7 +18,8 @@ type ProjectFormModalProps = {
   invalidFields: Set<InvalidField>;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onFieldChange: (field: keyof ProjectFormState, value: string) => void;
+  onFieldChange: (field: TextField, value: string) => void;
+  onToggleAssignee: (member: TeamMember) => void;
 };
 
 export function ProjectFormModal({
@@ -26,6 +30,7 @@ export function ProjectFormModal({
   onClose,
   onSubmit,
   onFieldChange,
+  onToggleAssignee,
 }: ProjectFormModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -109,22 +114,23 @@ export function ProjectFormModal({
             </label>
           </div>
 
-          <label className="form-field">
+          <div className="form-field">
             <span className="form-label">Assigned To</span>
-            <select
-              className={`form-select${invalidFields.has("assignee") ? " invalid" : ""}`}
-              value={formData.assignee}
-              onChange={(event) => onFieldChange("assignee", event.target.value)}
-              required
+            <div
+              className={`assignee-checkbox-grid${invalidFields.has("assignees") ? " invalid" : ""}`}
             >
-              <option value="">Select team member...</option>
               {TEAM_MEMBERS.map((member) => (
-                <option value={member} key={member}>
+                <label className="assignee-checkbox" key={member}>
+                  <input
+                    type="checkbox"
+                    checked={formData.assignees.includes(member)}
+                    onChange={() => onToggleAssignee(member)}
+                  />
                   {member}
-                </option>
+                </label>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>

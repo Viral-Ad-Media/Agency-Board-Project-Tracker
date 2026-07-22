@@ -7,19 +7,21 @@ The original HTML file has since been removed after the UI was split into reusab
 
 ## Features
 
-- Kanban board with six workflow columns:
-  - Initiate
-  - Briefing
-  - In Production
-  - Review
-  - Done
-  - Live
-- Project cards with client, assignee, priority, deadline, and overdue status.
-- Drag and drop cards between workflow columns.
-- Project stage tracker with clickable completion bubbles.
-- Summary stats for total projects, overdue projects, and live projects.
+- Kanban board with editable workflow columns (defaults to Initiate, Briefing, In Production, Review, Done, Live).
+- Column management: rename, reorder, add, or delete columns from the "Columns" button in the header. A column can't be deleted while it still has cards, and each column can be flagged "counts as complete" (drives overdue/due-soon logic and the Completed stat).
+- Project cards with client, multiple assignees, priority, deadline, and overdue status.
+- "Due soon" warnings on cards whose deadline is within the next 3 days.
+- Drag and drop cards between workflow columns, or use the "Move to" selector in the project detail view.
+- Moving a card forward automatically marks the earlier stages complete.
+- Project stage tracker with clickable completion bubbles, driven by the current set of board columns.
+- A per-project task checklist (subtasks) with add/toggle/assign/delete, separate from the stage pipeline.
+- Search and filter bar (text search over name/client/description, plus assignee and priority filters).
+- Summary stats for total, overdue, due-soon, and completed projects.
 - Add, edit, view, and delete project cards through modal dialogs.
-- Browser localStorage persistence under the `agencyBoard_v2` key.
+- Undo toast after deleting a project (6-second window).
+- Export the board to a JSON file and re-import it later (with a confirmation step before it replaces the board).
+- Browser localStorage persistence under the `agencyBoard_v2` (projects) and `agencyBoard_columns_v1` (columns) keys, with automatic migration from the older single-assignee/fixed-column data shape.
+- Board state stays in sync across tabs open to the same browser.
 - Seed project on first launch so the board is not empty.
 - Responsive styling for desktop and smaller screens.
 

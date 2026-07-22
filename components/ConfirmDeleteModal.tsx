@@ -23,7 +23,8 @@ export function ConfirmDeleteModal({
             </div>
             <h2 className="modal-title confirm-title">Delete Project?</h2>
             <p className="confirm-message">
-              &quot;{project.name}&quot; will be permanently removed. This cannot be undone.
+              &quot;{project.name}&quot; will be removed from the board. You&apos;ll have a few
+              seconds to undo.
             </p>
           </div>
           <div className="form-actions confirm-actions">

@@ -3,7 +3,8 @@ import { Plus } from "lucide-react";
 type SummaryStats = {
   total: number;
   overdue: number;
-  live: number;
+  dueSoon: number;
+  completed: number;
 };
 
 type SummaryBarProps = {
@@ -16,7 +17,8 @@ export function SummaryBar({ stats, onAddProject }: SummaryBarProps) {
     <section className="summary-bar" aria-label="Project summary">
       <SummaryStat tone="total" value={stats.total} label="Total Projects" />
       <SummaryStat tone="overdue" value={stats.overdue} label="Overdue" />
-      <SummaryStat tone="live" value={stats.live} label="Live" />
+      <SummaryStat tone="duesoon" value={stats.dueSoon} label="Due Soon" />
+      <SummaryStat tone="live" value={stats.completed} label="Completed" />
       <div className="summary-spacer" />
       <button className="btn-add-project" type="button" onClick={onAddProject}>
         <Plus size={15} />
@@ -31,7 +33,7 @@ function SummaryStat({
   value,
   label,
 }: {
-  tone: "total" | "overdue" | "live";
+  tone: "total" | "overdue" | "duesoon" | "live";
   value: number;
   label: string;
 }) {
