@@ -1,6 +1,6 @@
-# Agency Board Project Tracker
+# Agency Board Task Tracker
 
-Agency Board Project Tracker is a Next.js app for managing agency projects on a kanban-style board. It lets a team create project cards, move them through workflow columns, track stage completion, flag overdue work, and persist board state locally in the browser.
+Agency Board Task Tracker is a Next.js app for managing agency work on a kanban-style board. It lets a team create task cards, move them through editable workflow columns, track stage completion, break work down into subtasks, flag overdue work, and persist board state locally in the browser.
 
 This project was migrated from a single standalone HTML file into a typed Next.js App Router application.
 The original HTML file has since been removed after the UI was split into reusable React components.
@@ -9,20 +9,21 @@ The original HTML file has since been removed after the UI was split into reusab
 
 - Kanban board with editable workflow columns (defaults to Initiate, Briefing, In Production, Review, Done, Live).
 - Column management: rename, reorder, add, or delete columns from the "Columns" button in the header. A column can't be deleted while it still has cards, and each column can be flagged "counts as complete" (drives overdue/due-soon logic and the Completed stat).
-- Project cards with client, multiple assignees, priority, deadline, and overdue status.
+- Team management: add or remove team members from the "Team" button in the header. A member can't be removed while still assigned to a task or subtask, and the team always keeps at least one member.
+- Task cards with client, multiple assignees, priority, deadline, and overdue status.
 - "Due soon" warnings on cards whose deadline is within the next 3 days.
-- Drag and drop cards between workflow columns, or use the "Move to" selector in the project detail view.
+- Drag and drop cards between workflow columns, or use the "Move to" selector in the task detail view.
 - Moving a card forward automatically marks the earlier stages complete.
-- Project stage tracker with clickable completion bubbles, driven by the current set of board columns.
-- A per-project task checklist (subtasks) with add/toggle/assign/delete, separate from the stage pipeline.
+- Task stage tracker with clickable completion bubbles, driven by the current set of board columns.
+- A per-task subtask checklist with add/toggle/assign/delete, separate from the stage pipeline.
 - Search and filter bar (text search over name/client/description, plus assignee and priority filters).
-- Summary stats for total, overdue, due-soon, and completed projects.
-- Add, edit, view, and delete project cards through modal dialogs.
-- Undo toast after deleting a project (6-second window).
+- Summary stats for total, overdue, due-soon, and completed tasks.
+- Add, edit, view, and delete task cards through modal dialogs.
+- Undo toast after deleting a task (6-second window).
 - Export the board to a JSON file and re-import it later (with a confirmation step before it replaces the board).
-- Browser localStorage persistence under the `agencyBoard_v2` (projects) and `agencyBoard_columns_v1` (columns) keys, with automatic migration from the older single-assignee/fixed-column data shape.
+- Browser localStorage persistence under the `agencyBoard_v2` (tasks), `agencyBoard_columns_v1` (columns), and `agencyBoard_team_v1` (team members) keys, with automatic migration from older data shapes (single assignee, fixed columns, name-based assignee references).
 - Board state stays in sync across tabs open to the same browser.
-- Seed project on first launch so the board is not empty.
+- Seed task on first launch so the board is not empty.
 - Responsive styling for desktop and smaller screens.
 
 ## Tech Stack
@@ -106,21 +107,27 @@ Runs ESLint across the project.
 ├── app/
 │   ├── globals.css       # Design tokens and global UI styles
 │   ├── layout.tsx        # Root layout, metadata, and font setup
-│   └── page.tsx          # Main board UI and project state logic
+│   └── page.tsx          # Main board UI and task state logic
 ├── components/
 │   ├── AppHeader.tsx
 │   ├── BoardColumn.tsx
+│   ├── ColumnSettingsModal.tsx
 │   ├── ConfirmDeleteModal.tsx
 │   ├── DetailItem.tsx
+│   ├── FilterBar.tsx
+│   ├── ImportConfirmModal.tsx
 │   ├── Modal.tsx
 │   ├── PipelineTrack.tsx
-│   ├── ProjectBoard.tsx
-│   ├── ProjectCard.tsx
-│   ├── ProjectDetailModal.tsx
-│   ├── ProjectFormModal.tsx
-│   └── SummaryBar.tsx
+│   ├── SubtaskChecklist.tsx
+│   ├── SummaryBar.tsx
+│   ├── TaskBoard.tsx
+│   ├── TaskCard.tsx
+│   ├── TaskDetailModal.tsx
+│   ├── TaskFormModal.tsx
+│   ├── TeamSettingsModal.tsx
+│   └── UndoToast.tsx
 ├── lib/
-│   └── projects.ts       # Shared project types, constants, and utilities
+│   └── tasks.ts          # Shared task/column/team types, constants, and utilities
 ├── eslint.config.mjs     # ESLint flat config
 ├── next.config.mjs       # Next.js configuration
 ├── package.json          # Scripts, dependencies, and overrides
@@ -132,64 +139,80 @@ Runs ESLint across the project.
 
 The board is implemented as a client component in `app/page.tsx` because it depends on browser-only APIs and interactive state:
 
-- `localStorage` for persistence
+- `localStorage` for persistence (tasks, columns, and team members)
 - drag and drop events
 - modal open and close state
 - form state and validation feedback
-- project stage toggles
+- task stage toggles
 
-The page keeps the project list in React state and writes changes back to localStorage. The UI is rendered declaratively from that state, including card counts, summary stats, modals, pipelines, and overdue indicators.
+The page keeps the task list, column list, and team member list in React state and writes changes back to localStorage. The UI is rendered declaratively from that state, including card counts, summary stats, modals, pipelines, and overdue indicators.
 
 ## Reusable Components
 
 The UI is split into focused components under `components/`:
 
-- `AppHeader` renders the top navigation/brand area.
-- `SummaryBar` renders project totals and the add-project action.
-- `ProjectBoard` lays out the kanban board.
+- `AppHeader` renders the top navigation/brand area, plus Team, Columns, Export, and Import actions.
+- `SummaryBar` renders task totals and the add-task action.
+- `FilterBar` renders the search box and assignee/priority filters.
+- `TaskBoard` lays out the kanban board.
 - `BoardColumn` renders one workflow column and its drop zone.
-- `ProjectCard` renders a draggable project card.
+- `TaskCard` renders a draggable task card.
 - `PipelineTrack` renders the reusable stage completion bubbles for cards and detail views.
+- `SubtaskChecklist` renders the per-task subtask list inside the detail modal.
 - `Modal` provides the shared modal overlay/backdrop behavior.
-- `ProjectFormModal` handles add/edit project form UI.
-- `ProjectDetailModal` handles read-only project details and project actions.
+- `TaskFormModal` handles add/edit task form UI.
+- `TaskDetailModal` handles read-only task details and task actions.
 - `ConfirmDeleteModal` handles delete confirmation.
+- `ImportConfirmModal` handles the confirm-before-replace step for imports.
+- `ColumnSettingsModal` handles rename/reorder/add/delete for board columns.
+- `TeamSettingsModal` handles add/remove for team members.
+- `UndoToast` shows the post-delete undo affordance.
 - `DetailItem` renders labeled detail rows inside modals.
 
-Shared project constants, TypeScript types, localStorage normalization, date formatting, overdue checks, and seed data live in `lib/projects.ts`.
+Shared task/column/team constants, TypeScript types, localStorage normalization, date formatting, overdue checks, and seed data live in `lib/tasks.ts`.
 
 ## Data Model
 
-Each project is stored as an object similar to:
+Each task is stored as an object similar to:
 
 ```ts
-type Project = {
+type Task = {
   id: string;
   name: string;
   client: string;
   desc: string;
-  column: "Initiate" | "Briefing" | "In Production" | "Review" | "Done" | "Live";
-  assignee: string;
+  column: string; // references a board column's id
+  assignees: string[]; // team member ids
   priority: "High" | "Medium" | "Low";
   deadline: string;
-  stages: boolean[];
+  stages: Record<string, boolean>; // keyed by column id
+  subtasks: Subtask[];
   createdAt: number;
+};
+
+type Subtask = {
+  id: string;
+  title: string;
+  done: boolean;
+  assignee: "" | string; // team member id
 };
 ```
 
-The `stages` array matches the board column order. For example, index `0` maps to `Initiate`, index `1` maps to `Briefing`, and so on.
+Board columns and team members are stored separately as editable lists (`BoardColumnDef[]` and `TeamMemberDef[]`), so `column` and `assignees` reference ids from those lists rather than fixed literal values.
 
 ## Persistence
 
-Projects are stored in browser localStorage:
+Board state is stored in browser localStorage under three keys:
 
 ```text
-agencyBoard_v2
+agencyBoard_v2            # tasks
+agencyBoard_columns_v1    # board columns
+agencyBoard_team_v1       # team members
 ```
 
-The app normalizes loaded projects before rendering them. This protects the UI from malformed or older localStorage data by filling missing fields with safe defaults where possible.
+The app normalizes loaded data before rendering it. This protects the UI from malformed or older localStorage data by filling missing fields with safe defaults, and migrates older data shapes (a single `assignee` string instead of an `assignees` array, positional `stages` arrays instead of a column-keyed record, name-based assignee references instead of ids).
 
-To reset the board during development, clear the `agencyBoard_v2` key from your browser storage and reload the page. The seed project will be recreated automatically.
+To reset the board during development, clear all three keys from your browser storage and reload the page. The seed task will be recreated automatically.
 
 ## Migration Notes
 
@@ -207,7 +230,7 @@ The original app was a single HTML file containing markup, CSS, and JavaScript. 
 
 The migration also fixed a couple of interaction issues found during review:
 
-- The original form had both a submit handler and a submit button click handler, which could create or save a project twice. The Next.js version uses one `onSubmit` path.
+- The original form had both a submit handler and a submit button click handler, which could create or save a task twice. The Next.js version uses one `onSubmit` path.
 - The original detail modal pipeline rebuilt DOM nodes and reattached click listeners in a way that could toggle a stage twice. The Next.js version uses one reusable `PipelineTrack` component.
 - Dragging visual state is now controlled by React state instead of direct DOM class mutation.
 
@@ -258,7 +281,7 @@ npm run dev -- --port 3001
 
 ### Board data looks stale
 
-The board reads from localStorage. Clear the `agencyBoard_v2` key in your browser devtools, then reload.
+The board reads from localStorage. Clear the `agencyBoard_v2`, `agencyBoard_columns_v1`, and `agencyBoard_team_v1` keys in your browser devtools, then reload.
 
 ## Verification
 
@@ -287,4 +310,4 @@ npm run build
 npm run start
 ```
 
-Because project data currently lives in each user's browser localStorage, deployments do not share board data across users or devices. To make the board collaborative, add a backend database and replace the localStorage persistence layer.
+Because task data currently lives in each user's browser localStorage, deployments do not share board data across users or devices. To make the board collaborative, add a backend database and replace the localStorage persistence layer.

@@ -13,24 +13,40 @@ export const DEFAULT_COLUMNS: BoardColumnDef[] = [
   { id: "live", name: "Live", countsAsComplete: true },
 ];
 
+export type TeamMemberDef = {
+  id: string;
+  name: string;
+};
+
+export const DEFAULT_TEAM_MEMBERS: TeamMemberDef[] = [
+  { id: "wale", name: "Wale" },
+  { id: "beejay", name: "Beejay" },
+  { id: "dami", name: "Dami" },
+  { id: "mabel", name: "Mabel" },
+  { id: "laguda", name: "Laguda" },
+  { id: "mide", name: "Mide" },
+];
+
+export const AVATAR_PALETTE = ["#5a5aff", "#b05aff", "#ff6b2b", "#00cc88", "#ffaa00", "#00e5ff"];
+
 export const PRIORITIES = ["High", "Medium", "Low"] as const;
-export const TEAM_MEMBERS = ["Wale", "Beejay", "Dami", "Mabel", "Laguda", "Mide"] as const;
-export const PROJECT_STORAGE_KEY = "agencyBoard_v2";
+export const TASK_STORAGE_KEY = "agencyBoard_v2";
 export const COLUMNS_STORAGE_KEY = "agencyBoard_columns_v1";
+export const TEAM_MEMBERS_STORAGE_KEY = "agencyBoard_team_v1";
 export const DUE_SOON_WINDOW_DAYS = 3;
 
 export type Column = string;
 export type Priority = (typeof PRIORITIES)[number];
-export type TeamMember = (typeof TEAM_MEMBERS)[number];
+export type TeamMember = string;
 
-export type Task = {
+export type Subtask = {
   id: string;
   title: string;
   done: boolean;
   assignee: "" | TeamMember;
 };
 
-export type Project = {
+export type Task = {
   id: string;
   name: string;
   client: string;
@@ -40,11 +56,11 @@ export type Project = {
   priority: Priority;
   deadline: string;
   stages: Record<string, boolean>;
-  tasks: Task[];
+  subtasks: Subtask[];
   createdAt: number;
 };
 
-export type ProjectFormState = {
+export type TaskFormState = {
   name: string;
   client: string;
   desc: string;
@@ -53,16 +69,7 @@ export type ProjectFormState = {
   assignees: TeamMember[];
 };
 
-export type InvalidField = keyof ProjectFormState;
-
-export const AVATAR_COLORS: Record<TeamMember, string> = {
-  Wale: "#5a5aff",
-  Beejay: "#b05aff",
-  Dami: "#ff6b2b",
-  Mabel: "#00cc88",
-  Laguda: "#ffaa00",
-  Mide: "#00e5ff",
-};
+export type InvalidField = keyof TaskFormState;
 
 export const REQUIRED_FIELDS: InvalidField[] = [
   "name",
@@ -72,7 +79,7 @@ export const REQUIRED_FIELDS: InvalidField[] = [
   "assignees",
 ];
 
-export function createEmptyForm(): ProjectFormState {
+export function createEmptyForm(): TaskFormState {
   return {
     name: "",
     client: "",
@@ -83,14 +90,14 @@ export function createEmptyForm(): ProjectFormState {
   };
 }
 
-export function getMissingFields(formData: ProjectFormState): InvalidField[] {
+export function getMissingFields(formData: TaskFormState): InvalidField[] {
   return REQUIRED_FIELDS.filter((field) => {
     const value = formData[field];
     return Array.isArray(value) ? value.length === 0 : !value.trim();
   });
 }
 
-export function generateId(prefix: string = "p") {
+export function generateId(prefix: string = "t") {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `${prefix}_${crypto.randomUUID()}`;
   }
@@ -99,10 +106,6 @@ export function generateId(prefix: string = "p") {
 
 function isPriority(value: unknown): value is Priority {
   return typeof value === "string" && PRIORITIES.includes(value as Priority);
-}
-
-function isTeamMember(value: unknown): value is TeamMember {
-  return typeof value === "string" && TEAM_MEMBERS.includes(value as TeamMember);
 }
 
 export function findColumn(columns: BoardColumnDef[], columnId: string) {
@@ -165,23 +168,71 @@ function resolveStages(value: unknown, columns: BoardColumnDef[]): Record<string
   return record;
 }
 
-function resolveAssignees(source: Record<string, unknown>): TeamMember[] {
-  if (Array.isArray(source.assignees)) {
-    return source.assignees.filter(isTeamMember);
-  }
-
-  if (isTeamMember(source.assignee)) {
-    return [source.assignee];
-  }
-
-  return [];
+export function findTeamMember(teamMembers: TeamMemberDef[], memberId: string) {
+  return teamMembers.find((member) => member.id === memberId);
 }
 
-function resolveTasks(value: unknown): Task[] {
+export function getMemberName(teamMembers: TeamMemberDef[], memberId: string) {
+  return findTeamMember(teamMembers, memberId)?.name ?? memberId;
+}
+
+export function getAvatarColor(teamMembers: TeamMemberDef[], memberId: string) {
+  const index = teamMembers.findIndex((member) => member.id === memberId);
+  return AVATAR_PALETTE[index === -1 ? 0 : index % AVATAR_PALETTE.length];
+}
+
+export function normalizeTeamMembers(value: unknown): TeamMemberDef[] {
+  if (!Array.isArray(value)) return DEFAULT_TEAM_MEMBERS;
+
+  const members = value
+    .map((item): TeamMemberDef | null => {
+      if (!item || typeof item !== "object") return null;
+
+      const source = item as Record<string, unknown>;
+      const id = typeof source.id === "string" && source.id ? source.id : "";
+      const name = typeof source.name === "string" ? source.name.trim() : "";
+
+      if (!id || !name) return null;
+
+      return { id, name };
+    })
+    .filter((member): member is TeamMemberDef => Boolean(member));
+
+  return members.length > 0 ? members : DEFAULT_TEAM_MEMBERS;
+}
+
+function resolveMemberId(value: unknown, teamMembers: TeamMemberDef[]): string | null {
+  if (typeof value !== "string" || !value) return null;
+
+  return (
+    teamMembers.find((member) => member.id === value)?.id ??
+    teamMembers.find((member) => member.name === value)?.id ??
+    null
+  );
+}
+
+function resolveAssignees(
+  source: Record<string, unknown>,
+  teamMembers: TeamMemberDef[],
+): TeamMember[] {
+  const raw = Array.isArray(source.assignees)
+    ? source.assignees
+    : typeof source.assignee === "string"
+      ? [source.assignee]
+      : [];
+
+  const resolved = raw
+    .map((item) => resolveMemberId(item, teamMembers))
+    .filter((id): id is string => Boolean(id));
+
+  return Array.from(new Set(resolved));
+}
+
+function resolveSubtasks(value: unknown, teamMembers: TeamMemberDef[]): Subtask[] {
   if (!Array.isArray(value)) return [];
 
   return value
-    .map((item): Task | null => {
+    .map((item): Subtask | null => {
       if (!item || typeof item !== "object") return null;
 
       const source = item as Record<string, unknown>;
@@ -189,16 +240,20 @@ function resolveTasks(value: unknown): Task[] {
       if (!title) return null;
 
       return {
-        id: typeof source.id === "string" && source.id ? source.id : generateId("task"),
+        id: typeof source.id === "string" && source.id ? source.id : generateId("subtask"),
         title,
         done: Boolean(source.done),
-        assignee: isTeamMember(source.assignee) ? source.assignee : "",
+        assignee: resolveMemberId(source.assignee, teamMembers) ?? "",
       };
     })
-    .filter((task): task is Task => Boolean(task));
+    .filter((subtask): subtask is Subtask => Boolean(subtask));
 }
 
-export function normalizeProject(value: unknown, columns: BoardColumnDef[]): Project | null {
+export function normalizeTask(
+  value: unknown,
+  columns: BoardColumnDef[],
+  teamMembers: TeamMemberDef[],
+): Task | null {
   if (!value || typeof value !== "object") return null;
 
   const source = value as Record<string, unknown>;
@@ -207,7 +262,8 @@ export function normalizeProject(value: unknown, columns: BoardColumnDef[]): Pro
 
   if (!name || !client) return null;
 
-  const assignees = resolveAssignees(source);
+  const assignees = resolveAssignees(source, teamMembers);
+  const rawSubtasks = Array.isArray(source.subtasks) ? source.subtasks : source.tasks;
 
   return {
     id: typeof source.id === "string" && source.id ? source.id : generateId(),
@@ -215,16 +271,16 @@ export function normalizeProject(value: unknown, columns: BoardColumnDef[]): Pro
     client,
     desc: typeof source.desc === "string" ? source.desc : "",
     column: resolveColumnId(source.column, columns),
-    assignees: assignees.length > 0 ? assignees : [TEAM_MEMBERS[0]],
+    assignees: assignees.length > 0 ? assignees : [teamMembers[0]?.id ?? ""],
     priority: isPriority(source.priority) ? source.priority : "Medium",
     deadline: typeof source.deadline === "string" ? source.deadline : "",
     stages: resolveStages(source.stages, columns),
-    tasks: resolveTasks(source.tasks),
+    subtasks: resolveSubtasks(rawSubtasks, teamMembers),
     createdAt: typeof source.createdAt === "number" ? source.createdAt : Date.now(),
   };
 }
 
-export function createSeedProject(columns: BoardColumnDef[]): Project {
+export function createSeedTask(columns: BoardColumnDef[], teamMembers: TeamMemberDef[]): Task {
   const deadline = new Date();
   deadline.setDate(deadline.getDate() + 30);
 
@@ -233,19 +289,31 @@ export function createSeedProject(columns: BoardColumnDef[]): Project {
     stages[column.id] = index === 0;
   });
 
+  const primaryMember = teamMembers[0]?.id ?? "";
+
   return {
     id: generateId(),
     name: "Automated SEO Topical Authority",
     client: "Internal",
     desc: "Build an AI-powered system that writes and publishes daily SEO-optimized blog posts with affiliate link insertion across multiple niche blogs.",
     column: columns[0]?.id ?? "",
-    assignees: ["Wale"],
+    assignees: [primaryMember],
     priority: "High",
     deadline: deadline.toISOString().split("T")[0],
     stages,
-    tasks: [
-      { id: generateId("task"), title: "Draft content calendar", done: true, assignee: "Wale" },
-      { id: generateId("task"), title: "Set up publishing pipeline", done: false, assignee: "" },
+    subtasks: [
+      {
+        id: generateId("subtask"),
+        title: "Draft content calendar",
+        done: true,
+        assignee: primaryMember,
+      },
+      {
+        id: generateId("subtask"),
+        title: "Set up publishing pipeline",
+        done: false,
+        assignee: "",
+      },
     ],
     createdAt: Date.now(),
   };
@@ -262,29 +330,29 @@ export function formatDate(value: string) {
   return `${day} ${months[monthIndex]} ${year}`;
 }
 
-export function daysUntilDeadline(project: Project): number | null {
-  if (!project.deadline) return null;
+export function daysUntilDeadline(task: Task): number | null {
+  if (!task.deadline) return null;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const due = new Date(`${project.deadline}T00:00:00`);
+  const due = new Date(`${task.deadline}T00:00:00`);
   if (Number.isNaN(due.getTime())) return null;
 
   return Math.round((due.getTime() - today.getTime()) / 86_400_000);
 }
 
-export function isOverdue(project: Project, columns: BoardColumnDef[]) {
-  if (isColumnComplete(columns, project.column)) return false;
+export function isOverdue(task: Task, columns: BoardColumnDef[]) {
+  if (isColumnComplete(columns, task.column)) return false;
 
-  const days = daysUntilDeadline(project);
+  const days = daysUntilDeadline(task);
   return days !== null && days < 0;
 }
 
-export function isDueSoon(project: Project, columns: BoardColumnDef[]) {
-  if (isColumnComplete(columns, project.column)) return false;
+export function isDueSoon(task: Task, columns: BoardColumnDef[]) {
+  if (isColumnComplete(columns, task.column)) return false;
 
-  const days = daysUntilDeadline(project);
+  const days = daysUntilDeadline(task);
   return days !== null && days >= 0 && days <= DUE_SOON_WINDOW_DAYS;
 }
 
@@ -309,12 +377,12 @@ export function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase() || "--";
 }
 
-export function countCompleteStages(project: Project, columns: BoardColumnDef[]) {
-  return columns.filter((column) => project.stages[column.id]).length;
+export function countCompleteStages(task: Task, columns: BoardColumnDef[]) {
+  return columns.filter((column) => task.stages[column.id]).length;
 }
 
-export function countCompleteTasks(project: Project) {
-  return project.tasks.filter((task) => task.done).length;
+export function countCompleteSubtasks(task: Task) {
+  return task.subtasks.filter((subtask) => subtask.done).length;
 }
 
 export function priorityClass(priority: Priority) {

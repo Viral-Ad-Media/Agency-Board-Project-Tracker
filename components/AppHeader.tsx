@@ -1,13 +1,19 @@
-import { Download, LayoutGrid, Settings, Upload } from "lucide-react";
+import { Download, LayoutGrid, Settings, Upload, Users } from "lucide-react";
 import { useRef } from "react";
 
 type AppHeaderProps = {
   onExport: () => void;
   onImportFile: (file: File) => void;
   onManageColumns: () => void;
+  onManageTeam: () => void;
 };
 
-export function AppHeader({ onExport, onImportFile, onManageColumns }: AppHeaderProps) {
+export function AppHeader({
+  onExport,
+  onImportFile,
+  onManageColumns,
+  onManageTeam,
+}: AppHeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -19,10 +25,14 @@ export function AppHeader({ onExport, onImportFile, onManageColumns }: AppHeader
           </div>
           <span className="brand-name">Agency Board</span>
           <span className="brand-divider" />
-          <span className="brand-sub">Project Tracker</span>
+          <span className="brand-sub">Task Tracker</span>
         </div>
 
         <div className="header-actions">
+          <button className="btn-ghost" type="button" onClick={onManageTeam}>
+            <Users size={13} aria-hidden="true" />
+            Team
+          </button>
           <button className="btn-ghost" type="button" onClick={onManageColumns}>
             <Settings size={13} aria-hidden="true" />
             Columns

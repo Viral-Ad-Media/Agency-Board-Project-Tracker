@@ -1,17 +1,18 @@
 import type { CSSProperties, DragEvent } from "react";
-import { ProjectCard } from "./ProjectCard";
-import type { BoardColumnDef, Column, Project } from "../lib/projects";
+import { TaskCard } from "./TaskCard";
+import type { BoardColumnDef, Column, Task, TeamMemberDef } from "../lib/tasks";
 
 type BoardColumnProps = {
   column: BoardColumnDef;
   columns: BoardColumnDef[];
+  teamMembers: TeamMemberDef[];
   accentColor: string;
-  projects: Project[];
+  tasks: Task[];
   draggingId: string | null;
   isDragOver: boolean;
-  onOpenProject: (projectId: string) => void;
-  onToggleStage: (projectId: string, columnId: string) => void;
-  onCardDragStart: (event: DragEvent<HTMLDivElement>, projectId: string) => void;
+  onOpenTask: (taskId: string) => void;
+  onToggleStage: (taskId: string, columnId: string) => void;
+  onCardDragStart: (event: DragEvent<HTMLDivElement>, taskId: string) => void;
   onCardDragEnd: () => void;
   onColumnDragOver: (event: DragEvent<HTMLDivElement>, columnId: Column) => void;
   onColumnDragLeave: (event: DragEvent<HTMLDivElement>) => void;
@@ -21,11 +22,12 @@ type BoardColumnProps = {
 export function BoardColumn({
   column,
   columns,
+  teamMembers,
   accentColor,
-  projects,
+  tasks,
   draggingId,
   isDragOver,
-  onOpenProject,
+  onOpenTask,
   onToggleStage,
   onCardDragStart,
   onCardDragEnd,
@@ -41,7 +43,7 @@ export function BoardColumn({
     >
       <div className="column-header">
         <h2 className="column-title">{column.name}</h2>
-        <span className="column-count">{projects.length}</span>
+        <span className="column-count">{tasks.length}</span>
       </div>
 
       <div
@@ -51,16 +53,17 @@ export function BoardColumn({
         onDragLeave={onColumnDragLeave}
         onDrop={(event) => onColumnDrop(event, column.id)}
       >
-        {projects.length === 0 ? (
+        {tasks.length === 0 ? (
           <div className="column-empty">Drop cards here</div>
         ) : (
-          projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
+          tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
               columns={columns}
-              isDragging={draggingId === project.id}
-              onOpenDetail={onOpenProject}
+              teamMembers={teamMembers}
+              isDragging={draggingId === task.id}
+              onOpenDetail={onOpenTask}
               onToggleStage={onToggleStage}
               onDragStart={onCardDragStart}
               onDragEnd={onCardDragEnd}

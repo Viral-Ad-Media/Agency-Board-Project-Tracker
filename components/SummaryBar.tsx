@@ -9,20 +9,20 @@ type SummaryStats = {
 
 type SummaryBarProps = {
   stats: SummaryStats;
-  onAddProject: () => void;
+  onAddTask: () => void;
 };
 
-export function SummaryBar({ stats, onAddProject }: SummaryBarProps) {
+export function SummaryBar({ stats, onAddTask }: SummaryBarProps) {
   return (
-    <section className="summary-bar" aria-label="Project summary">
-      <SummaryStat tone="total" value={stats.total} label="Total Projects" />
+    <section className="summary-bar" aria-label="Task summary">
+      <SummaryStat tone="total" value={stats.total} label="Total Tasks" />
       <SummaryStat tone="overdue" value={stats.overdue} label="Overdue" />
       <SummaryStat tone="duesoon" value={stats.dueSoon} label="Due Soon" />
       <SummaryStat tone="live" value={stats.completed} label="Completed" />
       <div className="summary-spacer" />
-      <button className="btn-add-project" type="button" onClick={onAddProject}>
+      <button className="btn-add-task" type="button" onClick={onAddTask}>
         <Plus size={15} />
-        Initiate Project
+        Initiate Task
       </button>
     </section>
   );

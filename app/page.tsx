@@ -14,54 +14,61 @@ import { ColumnSettingsModal } from "../components/ColumnSettingsModal";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import { FilterBar } from "../components/FilterBar";
 import { ImportConfirmModal } from "../components/ImportConfirmModal";
-import { ProjectBoard } from "../components/ProjectBoard";
-import { ProjectDetailModal } from "../components/ProjectDetailModal";
-import { ProjectFormModal } from "../components/ProjectFormModal";
 import { SummaryBar } from "../components/SummaryBar";
+import { TaskBoard } from "../components/TaskBoard";
+import { TaskDetailModal } from "../components/TaskDetailModal";
+import { TaskFormModal } from "../components/TaskFormModal";
+import { TeamSettingsModal } from "../components/TeamSettingsModal";
 import { UndoToast } from "../components/UndoToast";
 import {
   COLUMNS_STORAGE_KEY,
   DEFAULT_COLUMNS,
-  PROJECT_STORAGE_KEY,
+  DEFAULT_TEAM_MEMBERS,
+  TASK_STORAGE_KEY,
+  TEAM_MEMBERS_STORAGE_KEY,
   createEmptyForm,
-  createSeedProject,
+  createSeedTask,
   generateId,
   getMissingFields,
   isColumnComplete,
   isDueSoon,
   isOverdue,
   normalizeColumns,
-  normalizeProject,
+  normalizeTask,
+  normalizeTeamMembers,
   syncStagesWithColumn,
   type BoardColumnDef,
   type Column,
   type InvalidField,
   type Priority,
-  type Project,
-  type ProjectFormState,
+  type Task,
+  type TaskFormState,
   type TeamMember,
-} from "../lib/projects";
+  type TeamMemberDef,
+} from "../lib/tasks";
 
 const UNDO_WINDOW_MS = 6000;
 
 export default function AgencyBoardPage() {
   const [columns, setColumns] = useState<BoardColumnDef[]>(DEFAULT_COLUMNS);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberDef[]>(DEFAULT_TEAM_MEMBERS);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [storageReady, setStorageReady] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<Column | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
+  const [isTeamSettingsOpen, setIsTeamSettingsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<ProjectFormState>(() => createEmptyForm());
+  const [formData, setFormData] = useState<TaskFormState>(() => createEmptyForm());
   const [invalidFields, setInvalidFields] = useState<Set<InvalidField>>(() => new Set());
   const [search, setSearch] = useState("");
   const [filterAssignee, setFilterAssignee] = useState("");
   const [filterPriority, setFilterPriority] = useState<"" | Priority>("");
-  const [lastDeleted, setLastDeleted] = useState<{ project: Project; index: number } | null>(null);
-  const [pendingImport, setPendingImport] = useState<{ fileName: string; projects: Project[] } | null>(
+  const [lastDeleted, setLastDeleted] = useState<{ task: Task; index: number } | null>(null);
+  const [pendingImport, setPendingImport] = useState<{ fileName: string; tasks: Task[] } | null>(
     null,
   );
   const invalidTimerRef = useRef<number | null>(null);
@@ -79,24 +86,37 @@ export default function AgencyBoardPage() {
 
     setColumns(loadedColumns);
 
+    let loadedTeamMembers = DEFAULT_TEAM_MEMBERS;
+
     try {
-      const raw = window.localStorage.getItem(PROJECT_STORAGE_KEY);
+      const rawTeamMembers = window.localStorage.getItem(TEAM_MEMBERS_STORAGE_KEY);
+      loadedTeamMembers = rawTeamMembers
+        ? normalizeTeamMembers(JSON.parse(rawTeamMembers))
+        : DEFAULT_TEAM_MEMBERS;
+    } catch (error) {
+      console.warn("team members localStorage read failed:", error);
+    }
+
+    setTeamMembers(loadedTeamMembers);
+
+    try {
+      const raw = window.localStorage.getItem(TASK_STORAGE_KEY);
 
       if (raw) {
         const parsed = JSON.parse(raw);
-        const nextProjects = Array.isArray(parsed)
+        const nextTasks = Array.isArray(parsed)
           ? parsed
-              .map((item) => normalizeProject(item, loadedColumns))
-              .filter((project): project is Project => Boolean(project))
+              .map((item) => normalizeTask(item, loadedColumns, loadedTeamMembers))
+              .filter((task): task is Task => Boolean(task))
           : [];
 
-        setProjects(nextProjects);
+        setTasks(nextTasks);
       } else {
-        setProjects([createSeedProject(loadedColumns)]);
+        setTasks([createSeedTask(loadedColumns, loadedTeamMembers)]);
       }
     } catch (error) {
       console.warn("localStorage read failed:", error);
-      setProjects([createSeedProject(loadedColumns)]);
+      setTasks([createSeedTask(loadedColumns, loadedTeamMembers)]);
     } finally {
       setStorageReady(true);
     }
@@ -116,11 +136,21 @@ export default function AgencyBoardPage() {
     if (!storageReady) return;
 
     try {
-      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
+      window.localStorage.setItem(TEAM_MEMBERS_STORAGE_KEY, JSON.stringify(teamMembers));
+    } catch (error) {
+      console.warn("team members localStorage write failed:", error);
+    }
+  }, [teamMembers, storageReady]);
+
+  useEffect(() => {
+    if (!storageReady) return;
+
+    try {
+      window.localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(tasks));
     } catch (error) {
       console.warn("localStorage write failed:", error);
     }
-  }, [projects, storageReady]);
+  }, [tasks, storageReady]);
 
   useEffect(() => {
     function handleStorage(event: StorageEvent) {
@@ -138,22 +168,36 @@ export default function AgencyBoardPage() {
         return;
       }
 
-      if (event.key !== PROJECT_STORAGE_KEY) return;
+      if (event.key === TEAM_MEMBERS_STORAGE_KEY) {
+        if (event.newValue === null) {
+          setTeamMembers(DEFAULT_TEAM_MEMBERS);
+          return;
+        }
+
+        try {
+          setTeamMembers(normalizeTeamMembers(JSON.parse(event.newValue)));
+        } catch (error) {
+          console.warn("cross-tab team sync parse failed:", error);
+        }
+        return;
+      }
+
+      if (event.key !== TASK_STORAGE_KEY) return;
 
       if (event.newValue === null) {
-        setProjects([]);
+        setTasks([]);
         return;
       }
 
       try {
         const parsed = JSON.parse(event.newValue);
-        const nextProjects = Array.isArray(parsed)
+        const nextTasks = Array.isArray(parsed)
           ? parsed
-              .map((item) => normalizeProject(item, columns))
-              .filter((project): project is Project => Boolean(project))
+              .map((item) => normalizeTask(item, columns, teamMembers))
+              .filter((task): task is Task => Boolean(task))
           : [];
 
-        setProjects(nextProjects);
+        setTasks(nextTasks);
       } catch (error) {
         console.warn("cross-tab sync parse failed:", error);
       }
@@ -161,7 +205,7 @@ export default function AgencyBoardPage() {
 
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, [columns]);
+  }, [columns, teamMembers]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -173,6 +217,8 @@ export default function AgencyBoardPage() {
         setPendingDeleteId(null);
       } else if (isColumnSettingsOpen) {
         setIsColumnSettingsOpen(false);
+      } else if (isTeamSettingsOpen) {
+        setIsTeamSettingsOpen(false);
       } else if (isFormOpen) {
         setIsFormOpen(false);
         setEditingId(null);
@@ -185,7 +231,14 @@ export default function AgencyBoardPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [pendingImport, pendingDeleteId, isColumnSettingsOpen, isFormOpen, viewingId]);
+  }, [
+    pendingImport,
+    pendingDeleteId,
+    isColumnSettingsOpen,
+    isTeamSettingsOpen,
+    isFormOpen,
+    viewingId,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -200,37 +253,52 @@ export default function AgencyBoardPage() {
 
   const stats = useMemo(
     () => ({
-      total: projects.length,
-      overdue: projects.filter((project) => isOverdue(project, columns)).length,
-      dueSoon: projects.filter((project) => isDueSoon(project, columns)).length,
-      completed: projects.filter((project) => isColumnComplete(columns, project.column)).length,
+      total: tasks.length,
+      overdue: tasks.filter((task) => isOverdue(task, columns)).length,
+      dueSoon: tasks.filter((task) => isDueSoon(task, columns)).length,
+      completed: tasks.filter((task) => isColumnComplete(columns, task.column)).length,
     }),
-    [projects, columns],
+    [tasks, columns],
   );
 
   const columnCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    projects.forEach((project) => {
-      counts[project.column] = (counts[project.column] ?? 0) + 1;
+    tasks.forEach((task) => {
+      counts[task.column] = (counts[task.column] ?? 0) + 1;
     });
     return counts;
-  }, [projects]);
+  }, [tasks]);
 
-  const visibleProjects = useMemo(() => {
+  const teamMemberCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    tasks.forEach((task) => {
+      task.assignees.forEach((memberId) => {
+        counts[memberId] = (counts[memberId] ?? 0) + 1;
+      });
+      task.subtasks.forEach((subtask) => {
+        if (subtask.assignee) {
+          counts[subtask.assignee] = (counts[subtask.assignee] ?? 0) + 1;
+        }
+      });
+    });
+    return counts;
+  }, [tasks]);
+
+  const visibleTasks = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return projects.filter((project) => {
-      if (filterAssignee && !project.assignees.includes(filterAssignee as TeamMember)) return false;
-      if (filterPriority && project.priority !== filterPriority) return false;
+    return tasks.filter((task) => {
+      if (filterAssignee && !task.assignees.includes(filterAssignee)) return false;
+      if (filterPriority && task.priority !== filterPriority) return false;
       if (!query) return true;
 
       return (
-        project.name.toLowerCase().includes(query) ||
-        project.client.toLowerCase().includes(query) ||
-        project.desc.toLowerCase().includes(query)
+        task.name.toLowerCase().includes(query) ||
+        task.client.toLowerCase().includes(query) ||
+        task.desc.toLowerCase().includes(query)
       );
     });
-  }, [projects, search, filterAssignee, filterPriority]);
+  }, [tasks, search, filterAssignee, filterPriority]);
 
   const isFiltering = Boolean(search.trim() || filterAssignee || filterPriority);
 
@@ -240,18 +308,13 @@ export default function AgencyBoardPage() {
     setFilterPriority("");
   }
 
-  const viewingProject = viewingId
-    ? projects.find((project) => project.id === viewingId) ?? null
-    : null;
-  const pendingDeleteProject = pendingDeleteId
-    ? projects.find((project) => project.id === pendingDeleteId) ?? null
+  const viewingTask = viewingId ? tasks.find((task) => task.id === viewingId) ?? null : null;
+  const pendingDeleteTask = pendingDeleteId
+    ? tasks.find((task) => task.id === pendingDeleteId) ?? null
     : null;
 
-  function setFormValue(
-    key: "name" | "client" | "desc" | "deadline" | "priority",
-    value: string,
-  ) {
-    setFormData((current) => ({ ...current, [key]: value }) as ProjectFormState);
+  function setFormValue(key: "name" | "client" | "desc" | "deadline" | "priority", value: string) {
+    setFormData((current) => ({ ...current, [key]: value }) as TaskFormState);
     setInvalidFields((current) => {
       if (!current.has(key)) return current;
 
@@ -285,17 +348,17 @@ export default function AgencyBoardPage() {
   }
 
   function openEditModal(id: string) {
-    const project = projects.find((item) => item.id === id);
-    if (!project) return;
+    const task = tasks.find((item) => item.id === id);
+    if (!task) return;
 
     setEditingId(id);
     setFormData({
-      name: project.name,
-      client: project.client,
-      desc: project.desc,
-      deadline: project.deadline,
-      priority: project.priority,
-      assignees: project.assignees,
+      name: task.name,
+      client: task.client,
+      desc: task.desc,
+      deadline: task.deadline,
+      priority: task.priority,
+      assignees: task.assignees,
     });
     setInvalidFields(new Set());
     setIsFormOpen(true);
@@ -329,7 +392,7 @@ export default function AgencyBoardPage() {
       return;
     }
 
-    const cleanProjectFields = {
+    const cleanTaskFields = {
       name: formData.name.trim(),
       client: formData.client.trim(),
       desc: formData.desc.trim(),
@@ -339,10 +402,8 @@ export default function AgencyBoardPage() {
     };
 
     if (editingId) {
-      setProjects((current) =>
-        current.map((project) =>
-          project.id === editingId ? { ...project, ...cleanProjectFields } : project,
-        ),
+      setTasks((current) =>
+        current.map((task) => (task.id === editingId ? { ...task, ...cleanTaskFields } : task)),
       );
     } else {
       const initialStages: Record<string, boolean> = {};
@@ -350,14 +411,14 @@ export default function AgencyBoardPage() {
         initialStages[column.id] = false;
       });
 
-      setProjects((current) => [
+      setTasks((current) => [
         ...current,
         {
           id: generateId(),
-          ...cleanProjectFields,
+          ...cleanTaskFields,
           column: columns[0]?.id ?? "",
           stages: initialStages,
-          tasks: [],
+          subtasks: [],
           createdAt: Date.now(),
         },
       ]);
@@ -367,20 +428,20 @@ export default function AgencyBoardPage() {
     closeDetailModal();
   }
 
-  const toggleStage = useCallback((projectId: string, columnId: string) => {
-    setProjects((current) =>
-      current.map((project) =>
-        project.id === projectId
-          ? { ...project, stages: { ...project.stages, [columnId]: !project.stages[columnId] } }
-          : project,
+  const toggleStage = useCallback((taskId: string, columnId: string) => {
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId
+          ? { ...task, stages: { ...task.stages, [columnId]: !task.stages[columnId] } }
+          : task,
       ),
     );
   }, []);
 
-  const handleDragStart = useCallback((event: DragEvent<HTMLDivElement>, projectId: string) => {
-    setDraggingId(projectId);
+  const handleDragStart = useCallback((event: DragEvent<HTMLDivElement>, taskId: string) => {
+    setDraggingId(taskId);
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", projectId);
+    event.dataTransfer.setData("text/plain", taskId);
   }, []);
 
   const handleDragEnd = useCallback(() => {
@@ -401,17 +462,17 @@ export default function AgencyBoardPage() {
     }
   }, []);
 
-  const moveProjectToColumn = useCallback(
-    (projectId: string, targetColumn: Column) => {
-      setProjects((current) =>
-        current.map((project) =>
-          project.id === projectId && project.column !== targetColumn
+  const moveTaskToColumn = useCallback(
+    (taskId: string, targetColumn: Column) => {
+      setTasks((current) =>
+        current.map((task) =>
+          task.id === taskId && task.column !== targetColumn
             ? {
-                ...project,
+                ...task,
                 column: targetColumn,
-                stages: syncStagesWithColumn(project.stages, columns, targetColumn),
+                stages: syncStagesWithColumn(task.stages, columns, targetColumn),
               }
-            : project,
+            : task,
         ),
       );
     },
@@ -421,39 +482,39 @@ export default function AgencyBoardPage() {
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>, targetColumn: Column) => {
       event.preventDefault();
-      const projectId = draggingId ?? event.dataTransfer.getData("text/plain");
+      const taskId = draggingId ?? event.dataTransfer.getData("text/plain");
 
       setDragOverColumn(null);
       setDraggingId(null);
 
-      if (!projectId) return;
+      if (!taskId) return;
 
-      moveProjectToColumn(projectId, targetColumn);
+      moveTaskToColumn(taskId, targetColumn);
     },
-    [draggingId, moveProjectToColumn],
+    [draggingId, moveTaskToColumn],
   );
 
-  function handleEditFromDetail(projectId: string) {
+  function handleEditFromDetail(taskId: string) {
     closeDetailModal();
-    openEditModal(projectId);
+    openEditModal(taskId);
   }
 
   function confirmDelete() {
     if (!pendingDeleteId) return;
 
-    const projectId = pendingDeleteId;
-    const index = projects.findIndex((project) => project.id === projectId);
-    const project = index >= 0 ? projects[index] : null;
+    const taskId = pendingDeleteId;
+    const index = tasks.findIndex((task) => task.id === taskId);
+    const task = index >= 0 ? tasks[index] : null;
 
-    setProjects((current) => current.filter((item) => item.id !== projectId));
+    setTasks((current) => current.filter((item) => item.id !== taskId));
     setPendingDeleteId(null);
 
-    if (viewingId === projectId) {
+    if (viewingId === taskId) {
       setViewingId(null);
     }
 
-    if (project) {
-      setLastDeleted({ project, index });
+    if (task) {
+      setLastDeleted({ task, index });
       if (undoTimerRef.current !== null) {
         window.clearTimeout(undoTimerRef.current);
       }
@@ -469,69 +530,69 @@ export default function AgencyBoardPage() {
       undoTimerRef.current = null;
     }
 
-    const { project, index } = lastDeleted;
+    const { task, index } = lastDeleted;
     setLastDeleted(null);
-    setProjects((current) => {
-      if (current.some((item) => item.id === project.id)) return current;
+    setTasks((current) => {
+      if (current.some((item) => item.id === task.id)) return current;
 
       const next = [...current];
-      next.splice(Math.min(index, next.length), 0, project);
+      next.splice(Math.min(index, next.length), 0, task);
       return next;
     });
   }
 
-  function addTask(projectId: string, title: string) {
-    setProjects((current) =>
-      current.map((project) =>
-        project.id === projectId
+  function addSubtask(taskId: string, title: string) {
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId
           ? {
-              ...project,
-              tasks: [
-                ...project.tasks,
-                { id: generateId("task"), title, done: false, assignee: "" },
+              ...task,
+              subtasks: [
+                ...task.subtasks,
+                { id: generateId("subtask"), title, done: false, assignee: "" },
               ],
             }
-          : project,
+          : task,
       ),
     );
   }
 
-  function toggleTask(projectId: string, taskId: string) {
-    setProjects((current) =>
-      current.map((project) =>
-        project.id === projectId
+  function toggleSubtask(taskId: string, subtaskId: string) {
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId
           ? {
-              ...project,
-              tasks: project.tasks.map((task) =>
-                task.id === taskId ? { ...task, done: !task.done } : task,
+              ...task,
+              subtasks: task.subtasks.map((subtask) =>
+                subtask.id === subtaskId ? { ...subtask, done: !subtask.done } : subtask,
               ),
             }
-          : project,
+          : task,
       ),
     );
   }
 
-  function assignTask(projectId: string, taskId: string, assignee: "" | TeamMember) {
-    setProjects((current) =>
-      current.map((project) =>
-        project.id === projectId
+  function assignSubtask(taskId: string, subtaskId: string, assignee: "" | TeamMember) {
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId
           ? {
-              ...project,
-              tasks: project.tasks.map((task) =>
-                task.id === taskId ? { ...task, assignee } : task,
+              ...task,
+              subtasks: task.subtasks.map((subtask) =>
+                subtask.id === subtaskId ? { ...subtask, assignee } : subtask,
               ),
             }
-          : project,
+          : task,
       ),
     );
   }
 
-  function deleteTask(projectId: string, taskId: string) {
-    setProjects((current) =>
-      current.map((project) =>
-        project.id === projectId
-          ? { ...project, tasks: project.tasks.filter((task) => task.id !== taskId) }
-          : project,
+  function deleteSubtask(taskId: string, subtaskId: string) {
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId
+          ? { ...task, subtasks: task.subtasks.filter((subtask) => subtask.id !== subtaskId) }
+          : task,
       ),
     );
   }
@@ -573,8 +634,19 @@ export default function AgencyBoardPage() {
     setColumns((current) => [...current, { id: generateId("col"), name, countsAsComplete: false }]);
   }
 
+  function deleteTeamMember(memberId: string) {
+    const isInUse = (teamMemberCounts[memberId] ?? 0) > 0;
+    if (isInUse || teamMembers.length <= 1) return;
+
+    setTeamMembers((current) => current.filter((member) => member.id !== memberId));
+  }
+
+  function addTeamMember(name: string) {
+    setTeamMembers((current) => [...current, { id: generateId("member"), name }]);
+  }
+
   function handleExport() {
-    const payload = JSON.stringify(projects, null, 2);
+    const payload = JSON.stringify(tasks, null, 2);
     const blob = new Blob([payload], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const dateStamp = new Date().toISOString().split("T")[0];
@@ -594,18 +666,18 @@ export default function AgencyBoardPage() {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result));
-        const nextProjects = Array.isArray(parsed)
+        const nextTasks = Array.isArray(parsed)
           ? parsed
-              .map((item) => normalizeProject(item, columns))
-              .filter((project): project is Project => Boolean(project))
+              .map((item) => normalizeTask(item, columns, teamMembers))
+              .filter((task): task is Task => Boolean(task))
           : [];
 
-        if (nextProjects.length === 0) {
-          window.alert("No valid projects were found in that file.");
+        if (nextTasks.length === 0) {
+          window.alert("No valid tasks were found in that file.");
           return;
         }
 
-        setPendingImport({ fileName: file.name, projects: nextProjects });
+        setPendingImport({ fileName: file.name, tasks: nextTasks });
       } catch (error) {
         console.warn("import parse failed:", error);
         window.alert("That file isn't valid JSON.");
@@ -618,7 +690,7 @@ export default function AgencyBoardPage() {
   function confirmImport() {
     if (!pendingImport) return;
 
-    setProjects(pendingImport.projects);
+    setTasks(pendingImport.tasks);
     setPendingImport(null);
     clearFilters();
   }
@@ -633,26 +705,29 @@ export default function AgencyBoardPage() {
         onExport={handleExport}
         onImportFile={handleImportFile}
         onManageColumns={() => setIsColumnSettingsOpen(true)}
+        onManageTeam={() => setIsTeamSettingsOpen(true)}
       />
-      <SummaryBar stats={stats} onAddProject={openAddModal} />
+      <SummaryBar stats={stats} onAddTask={openAddModal} />
       <FilterBar
         search={search}
         assignee={filterAssignee}
         priority={filterPriority}
-        matchCount={visibleProjects.length}
-        totalCount={projects.length}
+        teamMembers={teamMembers}
+        matchCount={visibleTasks.length}
+        totalCount={tasks.length}
         isFiltering={isFiltering}
         onSearchChange={setSearch}
         onAssigneeChange={setFilterAssignee}
         onPriorityChange={(value) => setFilterPriority(value as "" | Priority)}
         onClear={clearFilters}
       />
-      <ProjectBoard
+      <TaskBoard
         columns={columns}
-        projects={visibleProjects}
+        teamMembers={teamMembers}
+        tasks={visibleTasks}
         draggingId={draggingId}
         dragOverColumn={dragOverColumn}
-        onOpenProject={setViewingId}
+        onOpenTask={setViewingId}
         onToggleStage={toggleStage}
         onCardDragStart={handleDragStart}
         onCardDragEnd={handleDragEnd}
@@ -660,38 +735,40 @@ export default function AgencyBoardPage() {
         onColumnDragLeave={handleColumnDragLeave}
         onColumnDrop={handleDrop}
       />
-      <ProjectFormModal
+      <TaskFormModal
         isOpen={isFormOpen}
         isEditing={Boolean(editingId)}
         formData={formData}
         invalidFields={invalidFields}
+        teamMembers={teamMembers}
         onClose={closeFormModal}
         onSubmit={handleFormSubmit}
         onFieldChange={setFormValue}
         onToggleAssignee={toggleAssignee}
       />
-      <ProjectDetailModal
-        project={viewingProject}
+      <TaskDetailModal
+        task={viewingTask}
         columns={columns}
+        teamMembers={teamMembers}
         onClose={closeDetailModal}
         onEdit={handleEditFromDetail}
         onDelete={setPendingDeleteId}
         onToggleStage={toggleStage}
-        onMoveColumn={moveProjectToColumn}
-        onAddTask={addTask}
-        onToggleTask={toggleTask}
-        onAssignTask={assignTask}
-        onDeleteTask={deleteTask}
+        onMoveColumn={moveTaskToColumn}
+        onAddSubtask={addSubtask}
+        onToggleSubtask={toggleSubtask}
+        onAssignSubtask={assignSubtask}
+        onDeleteSubtask={deleteSubtask}
       />
       <ConfirmDeleteModal
-        project={pendingDeleteProject}
+        task={pendingDeleteTask}
         onCancel={closeConfirmModal}
         onConfirm={confirmDelete}
       />
       <ImportConfirmModal
         fileName={pendingImport?.fileName ?? null}
-        importCount={pendingImport?.projects.length ?? 0}
-        currentCount={projects.length}
+        importCount={pendingImport?.tasks.length ?? 0}
+        currentCount={tasks.length}
         onCancel={cancelImport}
         onConfirm={confirmImport}
       />
@@ -706,7 +783,15 @@ export default function AgencyBoardPage() {
         onDelete={deleteColumn}
         onAdd={addColumn}
       />
-      <UndoToast projectName={lastDeleted?.project.name ?? null} onUndo={undoDelete} />
+      <TeamSettingsModal
+        isOpen={isTeamSettingsOpen}
+        teamMembers={teamMembers}
+        memberCounts={teamMemberCounts}
+        onClose={() => setIsTeamSettingsOpen(false)}
+        onDelete={deleteTeamMember}
+        onAdd={addTeamMember}
+      />
+      <UndoToast taskName={lastDeleted?.task.name ?? null} onUndo={undoDelete} />
     </main>
   );
 }

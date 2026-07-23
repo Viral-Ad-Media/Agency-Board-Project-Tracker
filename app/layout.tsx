@@ -17,7 +17,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "Agency Board",
-  description: "A kanban-style project tracker for agency teams.",
+  description: "A kanban-style task tracker for agency teams.",
 };
 
 export default function RootLayout({

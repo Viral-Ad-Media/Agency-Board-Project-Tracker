@@ -1,10 +1,11 @@
 import { Search, X } from "lucide-react";
-import { PRIORITIES, TEAM_MEMBERS, type Priority } from "../lib/projects";
+import { PRIORITIES, type Priority, type TeamMemberDef } from "../lib/tasks";
 
 type FilterBarProps = {
   search: string;
   assignee: string;
   priority: "" | Priority;
+  teamMembers: TeamMemberDef[];
   matchCount: number;
   totalCount: number;
   isFiltering: boolean;
@@ -18,6 +19,7 @@ export function FilterBar({
   search,
   assignee,
   priority,
+  teamMembers,
   matchCount,
   totalCount,
   isFiltering,
@@ -27,16 +29,16 @@ export function FilterBar({
   onClear,
 }: FilterBarProps) {
   return (
-    <section className="filter-bar" aria-label="Project filters">
+    <section className="filter-bar" aria-label="Task filters">
       <span className="filter-search">
         <Search size={13} aria-hidden="true" />
         <input
           className="filter-input"
           type="search"
-          placeholder="Search projects or clients..."
+          placeholder="Search tasks or clients..."
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          aria-label="Search projects"
+          aria-label="Search tasks"
         />
       </span>
 
@@ -47,9 +49,9 @@ export function FilterBar({
         aria-label="Filter by assignee"
       >
         <option value="">All members</option>
-        {TEAM_MEMBERS.map((member) => (
-          <option value={member} key={member}>
-            {member}
+        {teamMembers.map((member) => (
+          <option value={member.id} key={member.id}>
+            {member.name}
           </option>
         ))}
       </select>
@@ -75,7 +77,7 @@ export function FilterBar({
             Clear
           </button>
           <span className="filter-count" role="status">
-            {matchCount} of {totalCount} projects
+            {matchCount} of {totalCount} tasks
           </span>
         </>
       ) : null}

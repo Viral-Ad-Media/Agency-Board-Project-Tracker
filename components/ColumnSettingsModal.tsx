@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Modal } from "./Modal";
-import type { BoardColumnDef } from "../lib/projects";
+import type { BoardColumnDef } from "../lib/tasks";
 
 type ColumnSettingsModalProps = {
   isOpen: boolean;
@@ -39,7 +39,7 @@ export function ColumnSettingsModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="modal column-settings-modal">
+      <div className="modal settings-modal">
         <div className="modal-header">
           <div>
             <h2 className="modal-title">Board Columns</h2>
@@ -53,12 +53,12 @@ export function ColumnSettingsModal({
           </button>
         </div>
 
-        <ul className="column-settings-list">
+        <ul className="settings-list">
           {columns.map((column, index) => {
             const count = columnCounts[column.id] ?? 0;
 
             return (
-              <li className="column-settings-row" key={column.id}>
+              <li className="settings-row" key={column.id}>
                 <div className="column-settings-reorder">
                   <button
                     className="icon-btn"
@@ -81,7 +81,7 @@ export function ColumnSettingsModal({
                 </div>
 
                 <input
-                  className="form-input column-settings-name"
+                  className="form-input settings-name"
                   type="text"
                   value={column.name}
                   onChange={(event) => onRename(column.id, event.target.value)}
@@ -97,7 +97,7 @@ export function ColumnSettingsModal({
                   Counts as complete
                 </label>
 
-                <span className="column-settings-count">{count}</span>
+                <span className="settings-count">{count}</span>
 
                 <button
                   className="icon-btn icon-btn-danger"
@@ -120,7 +120,7 @@ export function ColumnSettingsModal({
           })}
         </ul>
 
-        <form className="column-settings-add" onSubmit={handleAddSubmit}>
+        <form className="settings-add" onSubmit={handleAddSubmit}>
           <input
             className="form-input"
             type="text"
@@ -128,7 +128,7 @@ export function ColumnSettingsModal({
             value={newColumnName}
             onChange={(event) => setNewColumnName(event.target.value)}
           />
-          <button className="btn-secondary column-settings-add-btn" type="submit">
+          <button className="btn-secondary settings-add-btn" type="submit">
             <Plus size={14} />
             Add Column
           </button>

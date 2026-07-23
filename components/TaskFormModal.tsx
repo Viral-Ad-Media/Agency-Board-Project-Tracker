@@ -3,45 +3,47 @@ import type { FormEvent } from "react";
 import { Modal } from "./Modal";
 import {
   PRIORITIES,
-  TEAM_MEMBERS,
   type InvalidField,
-  type ProjectFormState,
+  type TaskFormState,
   type TeamMember,
-} from "../lib/projects";
+  type TeamMemberDef,
+} from "../lib/tasks";
 
 type TextField = "name" | "client" | "desc" | "deadline" | "priority";
 
-type ProjectFormModalProps = {
+type TaskFormModalProps = {
   isOpen: boolean;
   isEditing: boolean;
-  formData: ProjectFormState;
+  formData: TaskFormState;
   invalidFields: Set<InvalidField>;
+  teamMembers: TeamMemberDef[];
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onFieldChange: (field: TextField, value: string) => void;
   onToggleAssignee: (member: TeamMember) => void;
 };
 
-export function ProjectFormModal({
+export function TaskFormModal({
   isOpen,
   isEditing,
   formData,
   invalidFields,
+  teamMembers,
   onClose,
   onSubmit,
   onFieldChange,
   onToggleAssignee,
-}: ProjectFormModalProps) {
+}: TaskFormModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <div className="modal">
         <div className="modal-header">
           <div>
-            <h2 className="modal-title">{isEditing ? "Edit Project" : "Initiate Project"}</h2>
+            <h2 className="modal-title">{isEditing ? "Edit Task" : "Initiate Task"}</h2>
             <p className="modal-subtitle">
               {isEditing
-                ? "Update the project details below."
-                : "Fill in the details to create a new project card."}
+                ? "Update the task details below."
+                : "Fill in the details to create a new task card."}
             </p>
           </div>
           <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
@@ -51,7 +53,7 @@ export function ProjectFormModal({
 
         <form className="form-grid" onSubmit={onSubmit} noValidate>
           <label className="form-field">
-            <span className="form-label">Project Name</span>
+            <span className="form-label">Task Name</span>
             <input
               className={`form-input${invalidFields.has("name") ? " invalid" : ""}`}
               type="text"
@@ -78,7 +80,7 @@ export function ProjectFormModal({
             <span className="form-label">Description</span>
             <textarea
               className="form-textarea"
-              placeholder="Brief project description..."
+              placeholder="Brief task description..."
               value={formData.desc}
               onChange={(event) => onFieldChange("desc", event.target.value)}
             />
@@ -119,14 +121,14 @@ export function ProjectFormModal({
             <div
               className={`assignee-checkbox-grid${invalidFields.has("assignees") ? " invalid" : ""}`}
             >
-              {TEAM_MEMBERS.map((member) => (
-                <label className="assignee-checkbox" key={member}>
+              {teamMembers.map((member) => (
+                <label className="assignee-checkbox" key={member.id}>
                   <input
                     type="checkbox"
-                    checked={formData.assignees.includes(member)}
-                    onChange={() => onToggleAssignee(member)}
+                    checked={formData.assignees.includes(member.id)}
+                    onChange={() => onToggleAssignee(member.id)}
                   />
-                  {member}
+                  {member.name}
                 </label>
               ))}
             </div>
@@ -137,7 +139,7 @@ export function ProjectFormModal({
               Cancel
             </button>
             <button type="submit" className="btn-primary">
-              {isEditing ? "Save Changes" : "Create Project"}
+              {isEditing ? "Save Changes" : "Create Task"}
             </button>
           </div>
         </form>

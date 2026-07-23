@@ -245,7 +245,7 @@ textarea {
   flex: 1;
 }
 
-.btn-add-project {
+.btn-add-task {
   align-items: center;
   background: var(--accent-primary);
   border-radius: var(--radius-sm);
@@ -263,13 +263,13 @@ textarea {
     transform var(--transition-fast);
 }
 
-.btn-add-project:hover {
+.btn-add-task:hover {
   background: #6e6eff;
   box-shadow: 0 4px 16px rgba(90, 90, 255, 0.35);
   transform: translateY(-1px);
 }
 
-.btn-add-project:active {
+.btn-add-task:active {
   transform: translateY(0);
 }
 
@@ -1177,20 +1177,20 @@ textarea {
   text-transform: uppercase;
 }
 
-.task-checklist {
+.subtask-checklist {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.task-list {
+.subtask-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
   list-style: none;
 }
 
-.task-row {
+.subtask-row {
   align-items: center;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
@@ -1200,7 +1200,7 @@ textarea {
   padding: 8px 10px;
 }
 
-.task-checkbox {
+.subtask-checkbox {
   align-items: center;
   cursor: pointer;
   display: flex;
@@ -1209,7 +1209,7 @@ textarea {
   min-width: 0;
 }
 
-.task-title {
+.subtask-title {
   color: var(--text-primary);
   font-size: 13px;
   overflow: hidden;
@@ -1217,12 +1217,12 @@ textarea {
   white-space: nowrap;
 }
 
-.task-row.done .task-title {
+.subtask-row.done .subtask-title {
   color: var(--text-muted);
   text-decoration: line-through;
 }
 
-.task-assignee-select {
+.subtask-assignee-select {
   appearance: none;
   background: transparent;
   border: 1px solid var(--border-subtle);
@@ -1234,21 +1234,21 @@ textarea {
   padding: 4px 8px;
 }
 
-.task-assignee-select option {
+.subtask-assignee-select option {
   background: var(--bg-modal);
 }
 
-.task-empty {
+.subtask-empty {
   color: var(--text-muted);
   font-size: 12.5px;
 }
 
-.task-add-form {
+.subtask-add-form {
   display: flex;
   gap: 8px;
 }
 
-.task-add-btn {
+.subtask-add-btn {
   align-items: center;
   display: flex;
   flex-shrink: 0;
@@ -1369,11 +1369,11 @@ textarea {
   background: rgba(90, 90, 255, 0.12);
 }
 
-.column-settings-modal {
+.settings-modal {
   max-width: 560px;
 }
 
-.column-settings-list {
+.settings-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1383,7 +1383,7 @@ textarea {
   overflow-y: auto;
 }
 
-.column-settings-row {
+.settings-row {
   align-items: center;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
@@ -1400,10 +1400,20 @@ textarea {
   gap: 2px;
 }
 
-.column-settings-name {
+.settings-name {
   flex: 1;
   min-width: 0;
   padding: 8px 10px;
+}
+
+.settings-name-static {
+  align-items: center;
+  color: var(--text-primary);
+  display: flex;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .column-settings-complete {
@@ -1416,7 +1426,7 @@ textarea {
   white-space: nowrap;
 }
 
-.column-settings-count {
+.settings-count {
   background: var(--bg-card);
   border-radius: 99px;
   color: var(--text-muted);
@@ -1429,13 +1439,13 @@ textarea {
   text-align: center;
 }
 
-.column-settings-add {
+.settings-add {
   display: flex;
   gap: 8px;
   margin-bottom: 20px;
 }
 
-.column-settings-add-btn {
+.settings-add-btn {
   align-items: center;
   display: flex;
   flex-shrink: 0;

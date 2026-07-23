@@ -27,8 +27,8 @@ export function ImportConfirmModal({
             <h2 className="modal-title confirm-title">Import Backup?</h2>
             <p className="confirm-message">
               This will replace the current board ({currentCount}{" "}
-              {currentCount === 1 ? "project" : "projects"}) with {importCount}{" "}
-              {importCount === 1 ? "project" : "projects"} from &quot;{fileName}&quot;.
+              {currentCount === 1 ? "task" : "tasks"}) with {importCount}{" "}
+              {importCount === 1 ? "task" : "tasks"} from &quot;{fileName}&quot;.
             </p>
           </div>
           <div className="form-actions confirm-actions">

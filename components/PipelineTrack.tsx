@@ -1,26 +1,21 @@
 import { Check } from "lucide-react";
 import { Fragment } from "react";
-import type { BoardColumnDef, Project } from "../lib/projects";
+import type { BoardColumnDef, Task } from "../lib/tasks";
 
 type PipelineTrackProps = {
-  project: Project;
+  task: Task;
   columns: BoardColumnDef[];
   isDetail?: boolean;
-  onToggleStage: (projectId: string, columnId: string) => void;
+  onToggleStage: (taskId: string, columnId: string) => void;
 };
 
-export function PipelineTrack({
-  project,
-  columns,
-  isDetail = false,
-  onToggleStage,
-}: PipelineTrackProps) {
+export function PipelineTrack({ task, columns, isDetail = false, onToggleStage }: PipelineTrackProps) {
   return (
     <div className={isDetail ? "detail-pipeline-track" : "pipeline-track"}>
       {columns.map((column, index) => {
-        const complete = Boolean(project.stages[column.id]);
+        const complete = Boolean(task.stages[column.id]);
         const nextColumn = columns[index + 1];
-        const connectorComplete = complete && Boolean(nextColumn && project.stages[nextColumn.id]);
+        const connectorComplete = complete && Boolean(nextColumn && task.stages[nextColumn.id]);
 
         return (
           <Fragment key={column.id}>
@@ -31,7 +26,7 @@ export function PipelineTrack({
               aria-pressed={complete}
               onClick={(event) => {
                 event.stopPropagation();
-                onToggleStage(project.id, column.id);
+                onToggleStage(task.id, column.id);
               }}
             >
               <span className="stage-dot">
