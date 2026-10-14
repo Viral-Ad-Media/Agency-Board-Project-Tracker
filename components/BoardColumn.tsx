@@ -1,13 +1,15 @@
 import type { CSSProperties, DragEvent } from "react";
 import { TaskCard } from "./TaskCard";
-import type { BoardColumnDef, Column, Task, TeamMemberDef } from "../lib/tasks";
+import type { BoardColumnDef, Column, Project, Task, TeamMemberDef } from "../lib/tasks";
 
 type BoardColumnProps = {
   column: BoardColumnDef;
   columns: BoardColumnDef[];
   teamMembers: TeamMemberDef[];
+  projects: Project[];
   accentColor: string;
   tasks: Task[];
+  isFiltering: boolean;
   draggingId: string | null;
   isDragOver: boolean;
   onOpenTask: (taskId: string) => void;
@@ -23,8 +25,10 @@ export function BoardColumn({
   column,
   columns,
   teamMembers,
+  projects,
   accentColor,
   tasks,
+  isFiltering,
   draggingId,
   isDragOver,
   onOpenTask,
@@ -54,7 +58,7 @@ export function BoardColumn({
         onDrop={(event) => onColumnDrop(event, column.id)}
       >
         {tasks.length === 0 ? (
-          <div className="column-empty">Drop cards here</div>
+          <div className="column-empty">{isFiltering ? "No matches" : "Drop cards here"}</div>
         ) : (
           tasks.map((task) => (
             <TaskCard
@@ -62,6 +66,7 @@ export function BoardColumn({
               task={task}
               columns={columns}
               teamMembers={teamMembers}
+              projects={projects}
               isDragging={draggingId === task.id}
               onOpenDetail={onOpenTask}
               onToggleStage={onToggleStage}

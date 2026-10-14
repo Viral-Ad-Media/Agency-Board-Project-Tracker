@@ -1,34 +1,67 @@
-import { Plus, Trash2, X } from "lucide-react";
+import { Check, Copy, Plus, Trash2, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Modal } from "./Modal";
-import type { TeamMemberDef } from "../lib/tasks";
+import { Tooltip } from "./Tooltip";
+import type { WorkspaceMember } from "../lib/workspace";
 
 type TeamSettingsModalProps = {
   isOpen: boolean;
-  teamMembers: TeamMemberDef[];
+  members: WorkspaceMember[];
   memberCounts: Record<string, number>;
+  isOwner: boolean;
   onClose: () => void;
-  onDelete: (memberId: string) => void;
-  onAdd: (name: string) => void;
+  onRemove: (memberId: string) => void;
+  onInvite: (email: string, name: string) => Promise<string>;
 };
 
 export function TeamSettingsModal({
   isOpen,
-  teamMembers,
+  members,
   memberCounts,
+  isOwner,
   onClose,
-  onDelete,
-  onAdd,
+  onRemove,
+  onInvite,
 }: TeamSettingsModalProps) {
-  const [newMemberName, setNewMemberName] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [lastInviteToken, setLastInviteToken] = useState<string | null>(null);
 
-  function handleAddSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleInviteSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const trimmed = newMemberName.trim();
-    if (!trimmed) return;
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    if (!trimmedName || !trimmedEmail) return;
 
-    onAdd(trimmed);
-    setNewMemberName("");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const token = await onInvite(trimmedEmail, trimmedName);
+      setLastInviteToken(token);
+      setName("");
+      setEmail("");
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : "Couldn't send that invite.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function copyInviteLink(token: string) {
+    const link = `${window.location.origin}/invite/${token}`;
+    navigator.clipboard
+      .writeText(link)
+      .then(() => {
+        setCopiedToken(token);
+        window.setTimeout(() => setCopiedToken((current) => (current === token ? null : current)), 2000);
+      })
+      .catch(() => {
+        window.prompt("Copy this invite link:", link);
+      });
   }
 
   return (
@@ -38,57 +71,101 @@ export function TeamSettingsModal({
           <div>
             <h2 className="modal-title">Team Members</h2>
             <p className="modal-subtitle">
-              Add or remove people who can be assigned to tasks and subtasks. Members with
-              assignments can&apos;t be removed.
+              Invite teammates by email. They&apos;ll get a real login and can be assigned to
+              tasks and subtasks once they accept.
             </p>
           </div>
-          <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
+          <Tooltip label="Close">
+            <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
+              <X size={16} />
+            </button>
+          </Tooltip>
         </div>
 
         <ul className="settings-list">
-          {teamMembers.map((member) => {
+          {members.map((member) => {
             const count = memberCounts[member.id] ?? 0;
+            const canRemove = isOwner && member.role !== "owner" && count === 0;
 
             return (
               <li className="settings-row" key={member.id}>
-                <span className="settings-name settings-name-static">{member.name}</span>
+                <span className="settings-name settings-name-static">
+                  {member.name}
+                  <span
+                    className={`settings-status ${
+                      member.status === "active" ? "settings-status-active" : "settings-status-invited"
+                    }`}
+                  >
+                    {member.status === "active" ? "Active" : "Invited"}
+                  </span>
+                </span>
                 <span className="settings-count">{count}</span>
-                <button
-                  className="icon-btn icon-btn-danger"
-                  type="button"
-                  disabled={count > 0 || teamMembers.length <= 1}
-                  onClick={() => onDelete(member.id)}
-                  aria-label={`Remove ${member.name}`}
-                  title={
-                    count > 0
-                      ? "Unassign them from tasks and subtasks first"
-                      : teamMembers.length <= 1
-                        ? "The team needs at least one member"
-                        : `Remove ${member.name}`
-                  }
-                >
-                  <Trash2 size={13} />
-                </button>
+                {isOwner ? (
+                  <Tooltip
+                    label={
+                      member.role === "owner"
+                        ? "The workspace owner can't be removed"
+                        : count > 0
+                          ? "Unassign them from tasks and subtasks first"
+                          : `Remove ${member.name}`
+                    }
+                  >
+                    <button
+                      className="icon-btn icon-btn-danger"
+                      type="button"
+                      disabled={!canRemove}
+                      onClick={() => onRemove(member.id)}
+                      aria-label={`Remove ${member.name}`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </Tooltip>
+                ) : null}
               </li>
             );
           })}
         </ul>
 
-        <form className="settings-add" onSubmit={handleAddSubmit}>
-          <input
-            className="form-input"
-            type="text"
-            placeholder="New team member name..."
-            value={newMemberName}
-            onChange={(event) => setNewMemberName(event.target.value)}
-          />
-          <button className="btn-secondary settings-add-btn" type="submit">
-            <Plus size={14} />
-            Add Member
-          </button>
-        </form>
+        {isOwner ? (
+          <>
+            <form className="settings-add" onSubmit={handleInviteSubmit}>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Name..."
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+              <input
+                className="form-input"
+                type="email"
+                placeholder="Email..."
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <button className="btn-secondary settings-add-btn" type="submit" disabled={isSubmitting}>
+                <Plus size={14} />
+                {isSubmitting ? "Inviting..." : "Invite"}
+              </button>
+            </form>
+            {error ? <p className="auth-error">{error}</p> : null}
+            {lastInviteToken ? (
+              <div className="settings-invite-link">
+                <code>{`${typeof window !== "undefined" ? window.location.origin : ""}/invite/${lastInviteToken}`}</code>
+                <Tooltip label="Copy invite link">
+                  <button
+                    className="icon-btn"
+                    type="button"
+                    onClick={() => copyInviteLink(lastInviteToken)}
+                    aria-label="Copy invite link"
+                  >
+                    {copiedToken === lastInviteToken ? <Check size={13} /> : <Copy size={13} />}
+                  </button>
+                </Tooltip>
+              </div>
+            ) : null}
+          </>
+        ) : null}
 
         <div className="form-actions">
           <button className="btn-primary" type="button" onClick={onClose}>

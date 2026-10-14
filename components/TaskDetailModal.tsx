@@ -1,8 +1,10 @@
-import { X } from "lucide-react";
+import { Copy, X } from "lucide-react";
+import { AttachmentList } from "./AttachmentList";
 import { DetailItem } from "./DetailItem";
 import { Modal } from "./Modal";
 import { PipelineTrack } from "./PipelineTrack";
 import { SubtaskChecklist } from "./SubtaskChecklist";
+import { Tooltip } from "./Tooltip";
 import {
   findColumn,
   formatDate,
@@ -15,7 +17,9 @@ import {
   priorityClass,
   type BoardColumnDef,
   type Column,
+  type Project,
   type Task,
+  type TaskAttachment,
   type TeamMember,
   type TeamMemberDef,
 } from "../lib/tasks";
@@ -24,30 +28,44 @@ type TaskDetailModalProps = {
   task: Task | null;
   columns: BoardColumnDef[];
   teamMembers: TeamMemberDef[];
+  projects: Project[];
+  isUploadingAttachment: boolean;
   onClose: () => void;
   onEdit: (taskId: string) => void;
   onDelete: (taskId: string) => void;
+  onDuplicate: (taskId: string) => void;
   onToggleStage: (taskId: string, columnId: string) => void;
   onMoveColumn: (taskId: string, column: Column) => void;
+  onChangeProject: (taskId: string, projectId: string) => void;
   onAddSubtask: (taskId: string, title: string) => void;
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
   onAssignSubtask: (taskId: string, subtaskId: string, assignee: "" | TeamMember) => void;
   onDeleteSubtask: (taskId: string, subtaskId: string) => void;
+  onUploadAttachment: (taskId: string, file: File) => void;
+  onDownloadAttachment: (attachment: TaskAttachment) => void;
+  onDeleteAttachment: (taskId: string, attachmentId: string) => void;
 };
 
 export function TaskDetailModal({
   task,
   columns,
   teamMembers,
+  projects,
+  isUploadingAttachment,
   onClose,
   onEdit,
   onDelete,
+  onDuplicate,
   onToggleStage,
   onMoveColumn,
+  onChangeProject,
   onAddSubtask,
   onToggleSubtask,
   onAssignSubtask,
   onDeleteSubtask,
+  onUploadAttachment,
+  onDownloadAttachment,
+  onDeleteAttachment,
 }: TaskDetailModalProps) {
   return (
     <Modal isOpen={Boolean(task)} onClose={onClose}>
@@ -76,9 +94,11 @@ export function TaskDetailModal({
                 </label>
               </div>
             </div>
-            <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
-              <X size={16} />
-            </button>
+            <Tooltip label="Close">
+              <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
+                <X size={16} />
+              </button>
+            </Tooltip>
           </div>
 
           <div className="detail-meta-grid">
@@ -102,6 +122,23 @@ export function TaskDetailModal({
               </div>
             </div>
             <DetailItem label="Client" value={task.client} />
+            {projects.length > 0 ? (
+              <div className="detail-section">
+                <div className="detail-section-label">Project</div>
+                <select
+                  className="form-select detail-project-select"
+                  value={task.projectId}
+                  onChange={(event) => onChangeProject(task.id, event.target.value)}
+                >
+                  <option value="">No Project</option>
+                  {projects.map((project) => (
+                    <option value={project.id} key={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <DetailItem label="Deadline" value={formatDate(task.deadline)} />
             <div className="detail-section">
               <div className="detail-section-label">Status</div>
@@ -140,10 +177,31 @@ export function TaskDetailModal({
             />
           </div>
 
+          <div className="detail-pipeline-section">
+            <div className="detail-pipeline-title">Attachments</div>
+            <AttachmentList
+              attachments={task.attachments}
+              isUploading={isUploadingAttachment}
+              onUpload={(file) => onUploadAttachment(task.id, file)}
+              onDownload={onDownloadAttachment}
+              onDelete={(attachmentId) => onDeleteAttachment(task.id, attachmentId)}
+            />
+          </div>
+
           <div className="detail-actions">
             <button className="btn-danger" type="button" onClick={() => onDelete(task.id)}>
               Delete
             </button>
+            <Tooltip label="Duplicate this task">
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => onDuplicate(task.id)}
+              >
+                <Copy size={13} />
+                Duplicate
+              </button>
+            </Tooltip>
             <div className="detail-actions-spacer" />
             <button className="btn-secondary" type="button" onClick={onClose}>
               Close

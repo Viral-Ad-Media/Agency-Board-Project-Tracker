@@ -1,15 +1,17 @@
 import { X } from "lucide-react";
 import type { FormEvent } from "react";
 import { Modal } from "./Modal";
+import { Tooltip } from "./Tooltip";
 import {
   PRIORITIES,
   type InvalidField,
+  type Project,
   type TaskFormState,
   type TeamMember,
   type TeamMemberDef,
 } from "../lib/tasks";
 
-type TextField = "name" | "client" | "desc" | "deadline" | "priority";
+type TextField = "name" | "client" | "desc" | "deadline" | "priority" | "projectId";
 
 type TaskFormModalProps = {
   isOpen: boolean;
@@ -17,6 +19,7 @@ type TaskFormModalProps = {
   formData: TaskFormState;
   invalidFields: Set<InvalidField>;
   teamMembers: TeamMemberDef[];
+  projects: Project[];
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onFieldChange: (field: TextField, value: string) => void;
@@ -29,6 +32,7 @@ export function TaskFormModal({
   formData,
   invalidFields,
   teamMembers,
+  projects,
   onClose,
   onSubmit,
   onFieldChange,
@@ -46,9 +50,11 @@ export function TaskFormModal({
                 : "Fill in the details to create a new task card."}
             </p>
           </div>
-          <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
+          <Tooltip label="Close">
+            <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
+              <X size={16} />
+            </button>
+          </Tooltip>
         </div>
 
         <form className="form-grid" onSubmit={onSubmit} noValidate>
@@ -85,6 +91,24 @@ export function TaskFormModal({
               onChange={(event) => onFieldChange("desc", event.target.value)}
             />
           </label>
+
+          {projects.length > 0 ? (
+            <label className="form-field">
+              <span className="form-label">Project</span>
+              <select
+                className="form-select"
+                value={formData.projectId}
+                onChange={(event) => onFieldChange("projectId", event.target.value)}
+              >
+                <option value="">No Project</option>
+                {projects.map((project) => (
+                  <option value={project.id} key={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <div className="form-row">
             <label className="form-field">

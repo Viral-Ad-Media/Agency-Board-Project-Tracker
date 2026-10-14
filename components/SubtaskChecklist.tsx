@@ -1,5 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { Tooltip } from "./Tooltip";
 import type { Subtask, TeamMember, TeamMemberDef } from "../lib/tasks";
 
 type SubtaskChecklistProps = {
@@ -60,14 +61,16 @@ export function SubtaskChecklist({
                 ))}
               </select>
 
-              <button
-                className="icon-btn icon-btn-danger"
-                type="button"
-                onClick={() => onDelete(subtask.id)}
-                aria-label={`Delete subtask "${subtask.title}"`}
-              >
-                <X size={13} />
-              </button>
+              <Tooltip label="Delete subtask">
+                <button
+                  className="icon-btn icon-btn-danger"
+                  type="button"
+                  onClick={() => onDelete(subtask.id)}
+                  aria-label={`Delete subtask "${subtask.title}"`}
+                >
+                  <X size={13} />
+                </button>
+              </Tooltip>
             </li>
           ))}
         </ul>
