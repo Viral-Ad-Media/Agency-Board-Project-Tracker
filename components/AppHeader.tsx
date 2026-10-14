@@ -29,25 +29,45 @@ export function AppHeader({
         </div>
 
         <div className="header-actions">
-          <button className="btn-ghost" type="button" onClick={onManageTeam}>
+          <button
+            className="btn-ghost"
+            type="button"
+            onClick={onManageTeam}
+            aria-label="Team"
+            title="Team"
+          >
             <Users size={13} aria-hidden="true" />
-            Team
+            <span className="btn-label">Team</span>
           </button>
-          <button className="btn-ghost" type="button" onClick={onManageColumns}>
+          <button
+            className="btn-ghost"
+            type="button"
+            onClick={onManageColumns}
+            aria-label="Columns"
+            title="Columns"
+          >
             <Settings size={13} aria-hidden="true" />
-            Columns
+            <span className="btn-label">Columns</span>
           </button>
-          <button className="btn-ghost" type="button" onClick={onExport}>
+          <button
+            className="btn-ghost"
+            type="button"
+            onClick={onExport}
+            aria-label="Export"
+            title="Export"
+          >
             <Download size={13} aria-hidden="true" />
-            Export
+            <span className="btn-label">Export</span>
           </button>
           <button
             className="btn-ghost"
             type="button"
             onClick={() => fileInputRef.current?.click()}
+            aria-label="Import"
+            title="Import"
           >
             <Upload size={13} aria-hidden="true" />
-            Import
+            <span className="btn-label">Import</span>
           </button>
           <input
             ref={fileInputRef}
