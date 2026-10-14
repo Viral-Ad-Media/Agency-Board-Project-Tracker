@@ -1,10 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/invite", "/auth/callback"];
+const PUBLIC_PATHS = ["/login", "/signup", "/invite", "/auth/callback", "/features", "/pricing"];
 
+// "/" is public too: logged-out visitors get the marketing landing page, and
+// app/page.tsx renders the board instead once there is a session.
 function isPublicPath(pathname: string) {
-  return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  return (
+    pathname === "/" ||
+    PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+  );
 }
 
 export async function proxy(request: NextRequest) {
