@@ -14,13 +14,18 @@ type SummaryBarProps = {
 
 export function SummaryBar({ stats, onAddTask }: SummaryBarProps) {
   return (
-    <section className="summary-bar" aria-label="Task summary">
+    <section className="summary-bar" aria-label="Task summary" data-tour-id="summary-bar">
       <SummaryStat tone="total" value={stats.total} label="Total Tasks" />
       <SummaryStat tone="overdue" value={stats.overdue} label="Overdue" />
       <SummaryStat tone="duesoon" value={stats.dueSoon} label="Due Soon" />
       <SummaryStat tone="live" value={stats.completed} label="Completed" />
       <div className="summary-spacer" />
-      <button className="btn-add-task" type="button" onClick={onAddTask}>
+      <button
+        className="btn-add-task"
+        type="button"
+        data-tour-id="add-task-btn"
+        onClick={onAddTask}
+      >
         <Plus size={15} />
         Initiate Task
       </button>

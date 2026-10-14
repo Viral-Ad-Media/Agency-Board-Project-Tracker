@@ -1,37 +1,57 @@
 # Agency Board Task Tracker
 
-Agency Board Task Tracker is a Next.js app for managing agency work on a kanban-style board. It lets a team create task cards, move them through editable workflow columns, track stage completion, break work down into subtasks, flag overdue work, and persist board state locally in the browser.
-
-This project was migrated from a single standalone HTML file into a typed Next.js App Router application.
-The original HTML file has since been removed after the UI was split into reusable React components.
+Agency Board Task Tracker is a multi-tenant Next.js SaaS app for managing agency work. Each sign-up creates its own workspace with real accounts, email invites, and Postgres-backed data isolated per workspace via Supabase Row Level Security. Inside a workspace, teams get a kanban task board, Projects (timeline, requirements, features, and costed resources), and a Subscriptions tracker for every tool and app the agency pays for — all synced live across everyone in the workspace.
 
 ## Features
 
-- Kanban board with editable workflow columns (defaults to Initiate, Briefing, In Production, Review, Done, Live).
-- Column management: rename, reorder, add, or delete columns from the "Columns" button in the header. A column can't be deleted while it still has cards, and each column can be flagged "counts as complete" (drives overdue/due-soon logic and the Completed stat).
-- Team management: add or remove team members from the "Team" button in the header. A member can't be removed while still assigned to a task or subtask, and the team always keeps at least one member.
-- Task cards with client, multiple assignees, priority, deadline, and overdue status.
-- "Due soon" warnings on cards whose deadline is within the next 3 days.
-- Drag and drop cards between workflow columns, or use the "Move to" selector in the task detail view.
-- Moving a card forward automatically marks the earlier stages complete.
-- Task stage tracker with clickable completion bubbles, driven by the current set of board columns.
+### Accounts & workspaces
+
+- Email/password sign-up, log-in, and sign-out, backed by Supabase Auth.
+- Each sign-up bootstraps a new workspace with a default set of board columns (Initiate, Briefing, In Production, Review, Done, Live) and makes the signer-upper the workspace owner.
+- Owners invite teammates by email from the "Team" modal; invites generate a shareable `/invite/[token]` link. An invited member gets a real login, tied to that one workspace.
+- Every table is scoped by `workspace_id` with Postgres Row Level Security, so one workspace can never see another's data.
+- Realtime sync: task, column, project, and subscription changes made by any teammate appear live for everyone else in the workspace.
+
+### Task board
+
+- Kanban board with editable workflow columns. Column management (rename, reorder, add, delete, and "counts as complete" flagging) from the "Columns" button in the header. A column can't be deleted while it still has cards.
+- Task cards with client, multiple assignees, priority, deadline, and overdue/due-soon status.
+- Drag and drop cards between columns, or use the "Move to" selector in the task detail view. Moving a card forward automatically marks earlier stages complete.
 - A per-task subtask checklist with add/toggle/assign/delete, separate from the stage pipeline.
-- Search and filter bar (text search over name/client/description, plus assignee and priority filters).
+- Optionally assign a task to a Project (see below) from the task form or its detail view; assigned tasks show a project chip on their card.
+- Search and filter bar (text search over name/client/description, plus assignee, priority, and project filters).
 - Summary stats for total, overdue, due-soon, and completed tasks.
-- Add, edit, view, and delete task cards through modal dialogs.
 - Undo toast after deleting a task (6-second window).
 - Export the board to a JSON file and re-import it later (with a confirmation step before it replaces the board).
-- Browser localStorage persistence under the `agencyBoard_v2` (tasks), `agencyBoard_columns_v1` (columns), and `agencyBoard_team_v1` (team members) keys, with automatic migration from older data shapes (single assignee, fixed columns, name-based assignee references).
-- Board state stays in sync across tabs open to the same browser.
-- Seed task on first launch so the board is not empty.
+
+### Projects
+
+- A Project groups tasks under a name, client, status (planning/active/on hold/completed), start date, and target date.
+- Each project has its own features checklist, requirements checklist, and a costed resource list (name, cost, notes) with a running total.
+- "View Board" from a project filters the task board down to that project's tasks.
+- Deleting a project asks for confirmation first; its tasks are kept and simply unassigned from the project (not deleted).
+
+### Subscriptions
+
+- Workspace-wide tracker for every tool, app, and service the agency pays for — distinct from a project's one-off resource costs.
+- Each entry has a category, cost, billing cycle (monthly/yearly/weekly/one-time), status (active/trial/cancelled), renewal date, an owner (team member), a link, and notes.
+- A summary row shows estimated monthly spend, estimated annual spend, active tool count, and how many renewals are due in the next 14 days.
+- Deleting a subscription asks for confirmation first.
+
+### Onboarding & polish
+
+- One-time welcome modal on first visit, offering a guided product tour or the option to skip straight to the board.
+- A replayable product tour (from the "Help" button) spotlighting the Board/Projects/Subscriptions tabs, the summary bar, task creation, search/filters, the board itself, and team/column management.
+- An empty-board guide shown whenever the board has zero tasks, distinct from the per-column "No matches" message shown while a filter excludes everything.
+- Hover/focus tooltips on icon-only buttons, including dynamic tooltips explaining why a delete action is disabled.
 - Responsive styling for desktop and smaller screens.
 
 ## Tech Stack
 
-- Next.js `16.2.6`
+- Next.js `16.2.6` (App Router)
 - React `19.2.6`
 - TypeScript
-- App Router
+- Supabase: Postgres, Auth, Row Level Security, Realtime (`@supabase/supabase-js`, `@supabase/ssr`)
 - CSS Modules are not used; global styling lives in `app/globals.css`
 - `next/font` for Syne and DM Sans
 - `lucide-react` for icons
@@ -41,273 +61,115 @@ The original HTML file has since been removed after the UI was split into reusab
 
 Next.js in this project requires Node.js `>=20.9.0`.
 
-Recommended:
-
-```bash
-node --version
-npm --version
-```
+You'll also need a Supabase project (free tier is enough for development).
 
 ## Getting Started
 
-Install dependencies:
+1. Install dependencies:
 
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
-Start the development server:
+2. Create a Supabase project, then copy `.env.example` to `.env.local` and fill in your project's URL and anon key:
 
-```bash
-npm run dev
-```
+   ```bash
+   cp .env.example .env.local
+   ```
 
-Open the app:
+   ```text
+   NEXT_PUBLIC_SUPABASE_URL=
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=
+   ```
 
-```text
-http://localhost:3000
-```
+   Without these, the app renders a "Supabase isn't configured yet" placeholder instead of crashing — nothing else will work until they're set.
 
-If port `3000` is already in use, run Next on another port:
+3. Apply the schema in `supabase/migrations/0001_init.sql` to your project (via the Supabase SQL editor, the Supabase CLI, or the Supabase MCP `apply_migration` tool).
 
-```bash
-npm run dev -- --port 3001
-```
+4. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+5. Open `http://localhost:3000`, sign up, and you'll land on a fresh empty workspace.
 
 ## Scripts
 
 ```bash
-npm run dev
+npm run dev     # local development server
+npm run build   # production build + TypeScript check
+npm run start   # production server (after a build)
+npm run lint    # ESLint
 ```
-
-Starts the local Next.js development server.
-
-```bash
-npm run build
-```
-
-Creates an optimized production build and runs TypeScript validation.
-
-```bash
-npm run start
-```
-
-Starts the production server after a successful build.
-
-```bash
-npm run lint
-```
-
-Runs ESLint across the project.
 
 ## Project Structure
 
 ```text
 .
 ├── app/
-│   ├── globals.css       # Design tokens and global UI styles
-│   ├── layout.tsx        # Root layout, metadata, and font setup
-│   └── page.tsx          # Main board UI and task state logic
+│   ├── auth/callback/route.ts   # OAuth/email-confirmation code exchange
+│   ├── invite/[token]/          # Public invite-accept page + its client panel
+│   ├── login/page.tsx
+│   ├── signup/page.tsx
+│   ├── globals.css              # Design tokens and global UI styles
+│   ├── layout.tsx               # Root layout, metadata, and font setup
+│   └── page.tsx                 # Server Component: resolves the workspace, fetches board data
 ├── components/
-│   ├── AppHeader.tsx
-│   ├── BoardColumn.tsx
-│   ├── ColumnSettingsModal.tsx
-│   ├── ConfirmDeleteModal.tsx
-│   ├── DetailItem.tsx
-│   ├── FilterBar.tsx
-│   ├── ImportConfirmModal.tsx
-│   ├── Modal.tsx
-│   ├── PipelineTrack.tsx
-│   ├── SubtaskChecklist.tsx
-│   ├── SummaryBar.tsx
-│   ├── TaskBoard.tsx
-│   ├── TaskCard.tsx
-│   ├── TaskDetailModal.tsx
-│   ├── TaskFormModal.tsx
-│   ├── TeamSettingsModal.tsx
-│   └── UndoToast.tsx
+│   ├── Board.tsx                 # Client orchestrator: all board/project/subscription state & handlers
+│   ├── AppHeader, SummaryBar, FilterBar, TaskBoard, BoardColumn, TaskCard, PipelineTrack
+│   ├── TaskFormModal, TaskDetailModal, SubtaskChecklist, ColumnSettingsModal, TeamSettingsModal
+│   ├── ProjectsView, ProjectFormModal, ProjectDetailModal, ProjectChecklist
+│   ├── SubscriptionsView, ResourceFormModal
+│   ├── ConfirmDeleteModal, ConfirmActionModal, ImportConfirmModal, Modal, DetailItem, Tooltip
+│   ├── WelcomeModal, ProductTour, EmptyBoardState, UndoToast
 ├── lib/
-│   └── tasks.ts          # Shared task/column/team types, constants, and utilities
-├── eslint.config.mjs     # ESLint flat config
-├── next.config.mjs       # Next.js configuration
-├── package.json          # Scripts, dependencies, and overrides
-├── package-lock.json     # Locked dependency tree
-└── tsconfig.json         # TypeScript configuration
+│   ├── tasks.ts        # Storage-agnostic domain types, constants, and pure utility functions
+│   ├── workspace.ts     # The data-access layer: every Supabase query/mutation lives here
+│   ├── onboarding.ts     # Tour step content and the onboarding-seen storage key
+│   └── supabase/
+│       ├── client.ts      # Browser Supabase client
+│       └── server.ts      # Server Component / Route Handler Supabase client
+├── supabase/
+│   └── migrations/0001_init.sql   # Full schema, RLS policies, and auth/invite RPCs
+├── proxy.ts              # Next.js 16 middleware: session refresh + auth-gate redirects
+├── eslint.config.mjs
+├── next.config.mjs
+├── package.json
+└── tsconfig.json
 ```
 
 ## App Architecture
 
-The board is implemented as a client component in `app/page.tsx` because it depends on browser-only APIs and interactive state:
-
-- `localStorage` for persistence (tasks, columns, and team members)
-- drag and drop events
-- modal open and close state
-- form state and validation feedback
-- task stage toggles
-
-The page keeps the task list, column list, and team member list in React state and writes changes back to localStorage. The UI is rendered declaratively from that state, including card counts, summary stats, modals, pipelines, and overdue indicators.
-
-## Reusable Components
-
-The UI is split into focused components under `components/`:
-
-- `AppHeader` renders the top navigation/brand area, plus Team, Columns, Export, and Import actions.
-- `SummaryBar` renders task totals and the add-task action.
-- `FilterBar` renders the search box and assignee/priority filters.
-- `TaskBoard` lays out the kanban board.
-- `BoardColumn` renders one workflow column and its drop zone.
-- `TaskCard` renders a draggable task card.
-- `PipelineTrack` renders the reusable stage completion bubbles for cards and detail views.
-- `SubtaskChecklist` renders the per-task subtask list inside the detail modal.
-- `Modal` provides the shared modal overlay/backdrop behavior.
-- `TaskFormModal` handles add/edit task form UI.
-- `TaskDetailModal` handles read-only task details and task actions.
-- `ConfirmDeleteModal` handles delete confirmation.
-- `ImportConfirmModal` handles the confirm-before-replace step for imports.
-- `ColumnSettingsModal` handles rename/reorder/add/delete for board columns.
-- `TeamSettingsModal` handles add/remove for team members.
-- `UndoToast` shows the post-delete undo affordance.
-- `DetailItem` renders labeled detail rows inside modals.
-
-Shared task/column/team constants, TypeScript types, localStorage normalization, date formatting, overdue checks, and seed data live in `lib/tasks.ts`.
+- `app/page.tsx` is an async Server Component. It resolves the caller's workspace via `getCurrentWorkspace()`, fetches all board/project/subscription data in `getBoardData()`, and passes it to `<Board>` as initial props.
+- `components/Board.tsx` is a client component that owns all interactive state (drag-and-drop, modals, forms, filters) and issues optimistic updates: it updates local state immediately, then persists the change through `lib/workspace.ts`, reverting and showing an error if the write fails.
+- A single Realtime channel per workspace listens for `postgres_changes` on every relevant table and triggers a debounced full refetch, so changes made by teammates show up live.
+- `proxy.ts` (Next.js 16's replacement for `middleware.ts`) refreshes the Supabase session on every request and redirects unauthenticated users to `/login` (except for `/login`, `/signup`, `/invite/*`, and `/auth/callback`). It no-ops if Supabase env vars aren't set, so the app doesn't crash before they're configured.
+- `lib/tasks.ts` stays storage-agnostic: it only knows about plain TypeScript shapes (`Task`, `Project`, `WorkspaceResource`, etc.) and pure functions over them, so the ~20 presentational components never talk to Supabase directly.
+- `lib/workspace.ts` is the only file that talks to Supabase for board/project/subscription data — it hand-maps Postgres rows to the app-level types from `lib/tasks.ts`.
 
 ## Data Model
 
-Each task is stored as an object similar to:
+The full schema lives in `supabase/migrations/0001_init.sql`. At a high level:
 
-```ts
-type Task = {
-  id: string;
-  name: string;
-  client: string;
-  desc: string;
-  column: string; // references a board column's id
-  assignees: string[]; // team member ids
-  priority: "High" | "Medium" | "Low";
-  deadline: string;
-  stages: Record<string, boolean>; // keyed by column id
-  subtasks: Subtask[];
-  createdAt: number;
-};
+- `workspaces`, `workspace_members` — one workspace per sign-up; members have a `role` (owner/member) and `status` (invited/active).
+- `board_columns`, `tasks`, `task_assignees`, `subtasks` — the kanban board. `tasks.project_id` optionally links a task to a project.
+- `projects`, `project_features`, `project_requirements`, `project_resources` — Projects and their checklists/costed resources.
+- `workspace_resources` — the Subscriptions tracker.
 
-type Subtask = {
-  id: string;
-  title: string;
-  done: boolean;
-  assignee: "" | string; // team member id
-};
-```
+Every table carries a denormalized `workspace_id` so Row Level Security policies are flat, joinless, single-table checks (`is_workspace_member(workspace_id)`), backed by two `SECURITY DEFINER` helper functions that avoid recursive RLS lookups on `workspace_members`. Board/task/project/subscription IDs are client-generated `text` ids (see `generateId()` in `lib/tasks.ts`) so optimistic UI updates don't have to wait on a round trip; workspace and membership rows use server-generated `uuid`s.
 
-Board columns and team members are stored separately as editable lists (`BoardColumnDef[]` and `TeamMemberDef[]`), so `column` and `assignees` reference ids from those lists rather than fixed literal values.
+## Auth & Invites
 
-## Persistence
-
-Board state is stored in browser localStorage under three keys:
-
-```text
-agencyBoard_v2            # tasks
-agencyBoard_columns_v1    # board columns
-agencyBoard_team_v1       # team members
-```
-
-The app normalizes loaded data before rendering it. This protects the UI from malformed or older localStorage data by filling missing fields with safe defaults, and migrates older data shapes (a single `assignee` string instead of an `assignees` array, positional `stages` arrays instead of a column-keyed record, name-based assignee references instead of ids).
-
-To reset the board during development, clear all three keys from your browser storage and reload the page. The seed task will be recreated automatically.
-
-## Migration Notes
-
-The original app was a single HTML file containing markup, CSS, and JavaScript. The Next.js migration keeps the same product behavior while changing the implementation shape:
-
-- HTML structure became React components.
-- DOM event listeners became React event handlers.
-- Manual DOM rendering became state-driven rendering.
-- Inline SVG icons were replaced with `lucide-react` where practical.
-- Google Fonts are loaded through `next/font` instead of `<link>` tags.
-- Styling moved into `app/globals.css`.
-- The original HTML file was removed after the Next.js component structure was created.
-
-## Fixes Made During Migration
-
-The migration also fixed a couple of interaction issues found during review:
-
-- The original form had both a submit handler and a submit button click handler, which could create or save a task twice. The Next.js version uses one `onSubmit` path.
-- The original detail modal pipeline rebuilt DOM nodes and reattached click listeners in a way that could toggle a stage twice. The Next.js version uses one reusable `PipelineTrack` component.
-- Dragging visual state is now controlled by React state instead of direct DOM class mutation.
-
-## Styling
-
-The visual system is defined with CSS custom properties in `app/globals.css`:
-
-- background and surface colors
-- border colors
-- priority colors
-- typography variables
-- border radius values
-- motion durations
-
-The board intentionally keeps a compact operational-tool layout: dense columns, scannable cards, restrained contrast, and no marketing-style landing page.
-
-## Dependency Notes
-
-`package.json` includes a `postcss` override:
-
-```json
-"overrides": {
-  "postcss": "8.5.14"
-}
-```
-
-This keeps `npm audit` clean while staying on the installed Next.js release. Without the override, npm reports a moderate advisory through Next's pinned PostCSS dependency and suggests an unsuitable downgrade path.
-
-## Troubleshooting
-
-### npm cache permission error
-
-If `npm install` fails with an `EACCES` error related to `~/.npm`, the global npm cache may contain files owned by another user. You can avoid that cache for this project:
-
-```bash
-npm install --cache ./.npm-cache
-```
-
-The local `.npm-cache/` directory is ignored by Git.
-
-### Port already in use
-
-Use another port:
-
-```bash
-npm run dev -- --port 3001
-```
-
-### Board data looks stale
-
-The board reads from localStorage. Clear the `agencyBoard_v2`, `agencyBoard_columns_v1`, and `agencyBoard_team_v1` keys in your browser devtools, then reload.
-
-## Verification
-
-The migrated app has been checked with:
-
-```bash
-npm run lint
-npm run build
-npm audit --omit=dev
-```
-
-Expected results:
-
-- lint passes
-- production build completes
-- production dependency audit reports `0 vulnerabilities`
+- Sign-up calls `supabase.auth.signUp()`, then the `bootstrap_workspace` RPC to create the workspace, the owner's membership row, and default columns.
+- Invites go through `create_invite` (owner-only) and `get_invite_by_token` (publicly readable by token) RPCs; accepting one calls `accept_invite`, which links the invited row to the now-authenticated user.
+- A user can only belong to one workspace at a time — `accept_invite` rejects a second invite if the caller already has an active membership elsewhere, since there's no multi-workspace switcher UI yet (the schema supports it).
 
 ## Deployment
 
-This is a standard Next.js app and can be deployed to any platform that supports Next.js, such as Vercel, Netlify, or a Node.js server.
-
-For a production build:
+This is a standard Next.js app and can be deployed to any platform that supports it, such as Vercel or Netlify. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` as environment variables on your host, and make sure the migration has been applied to the Supabase project you point it at.
 
 ```bash
 npm run build
 npm run start
 ```
-
-Because task data currently lives in each user's browser localStorage, deployments do not share board data across users or devices. To make the board collaborative, add a backend database and replace the localStorage persistence layer.

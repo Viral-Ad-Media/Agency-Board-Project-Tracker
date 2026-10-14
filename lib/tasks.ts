@@ -4,35 +4,14 @@ export type BoardColumnDef = {
   countsAsComplete: boolean;
 };
 
-export const DEFAULT_COLUMNS: BoardColumnDef[] = [
-  { id: "initiate", name: "Initiate", countsAsComplete: false },
-  { id: "briefing", name: "Briefing", countsAsComplete: false },
-  { id: "in-production", name: "In Production", countsAsComplete: false },
-  { id: "review", name: "Review", countsAsComplete: false },
-  { id: "done", name: "Done", countsAsComplete: true },
-  { id: "live", name: "Live", countsAsComplete: true },
-];
-
 export type TeamMemberDef = {
   id: string;
   name: string;
 };
 
-export const DEFAULT_TEAM_MEMBERS: TeamMemberDef[] = [
-  { id: "wale", name: "Wale" },
-  { id: "beejay", name: "Beejay" },
-  { id: "dami", name: "Dami" },
-  { id: "mabel", name: "Mabel" },
-  { id: "laguda", name: "Laguda" },
-  { id: "mide", name: "Mide" },
-];
-
 export const AVATAR_PALETTE = ["#5a5aff", "#b05aff", "#ff6b2b", "#00cc88", "#ffaa00", "#00e5ff"];
 
 export const PRIORITIES = ["High", "Medium", "Low"] as const;
-export const TASK_STORAGE_KEY = "agencyBoard_v2";
-export const COLUMNS_STORAGE_KEY = "agencyBoard_columns_v1";
-export const TEAM_MEMBERS_STORAGE_KEY = "agencyBoard_team_v1";
 export const DUE_SOON_WINDOW_DAYS = 3;
 
 export type Column = string;
@@ -46,6 +25,24 @@ export type Subtask = {
   assignee: "" | TeamMember;
 };
 
+export type TaskAttachment = {
+  id: string;
+  storagePath: string;
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+  uploadedBy: string;
+  createdAt: number;
+};
+
+export const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024;
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export type Task = {
   id: string;
   name: string;
@@ -57,7 +54,9 @@ export type Task = {
   deadline: string;
   stages: Record<string, boolean>;
   subtasks: Subtask[];
+  attachments: TaskAttachment[];
   createdAt: number;
+  projectId: string;
 };
 
 export type TaskFormState = {
@@ -67,6 +66,7 @@ export type TaskFormState = {
   deadline: string;
   priority: "" | Priority;
   assignees: TeamMember[];
+  projectId: string;
 };
 
 export type InvalidField = keyof TaskFormState;
@@ -87,6 +87,7 @@ export function createEmptyForm(): TaskFormState {
     deadline: "",
     priority: "",
     assignees: [],
+    projectId: "",
   };
 }
 
@@ -114,26 +115,6 @@ export function findColumn(columns: BoardColumnDef[], columnId: string) {
 
 export function isColumnComplete(columns: BoardColumnDef[], columnId: string) {
   return Boolean(findColumn(columns, columnId)?.countsAsComplete);
-}
-
-export function normalizeColumns(value: unknown): BoardColumnDef[] {
-  if (!Array.isArray(value)) return DEFAULT_COLUMNS;
-
-  const columns = value
-    .map((item): BoardColumnDef | null => {
-      if (!item || typeof item !== "object") return null;
-
-      const source = item as Record<string, unknown>;
-      const id = typeof source.id === "string" && source.id ? source.id : "";
-      const name = typeof source.name === "string" ? source.name.trim() : "";
-
-      if (!id || !name) return null;
-
-      return { id, name, countsAsComplete: Boolean(source.countsAsComplete) };
-    })
-    .filter((column): column is BoardColumnDef => Boolean(column));
-
-  return columns.length > 0 ? columns : DEFAULT_COLUMNS;
 }
 
 function resolveColumnId(value: unknown, columns: BoardColumnDef[]): string {
@@ -179,26 +160,6 @@ export function getMemberName(teamMembers: TeamMemberDef[], memberId: string) {
 export function getAvatarColor(teamMembers: TeamMemberDef[], memberId: string) {
   const index = teamMembers.findIndex((member) => member.id === memberId);
   return AVATAR_PALETTE[index === -1 ? 0 : index % AVATAR_PALETTE.length];
-}
-
-export function normalizeTeamMembers(value: unknown): TeamMemberDef[] {
-  if (!Array.isArray(value)) return DEFAULT_TEAM_MEMBERS;
-
-  const members = value
-    .map((item): TeamMemberDef | null => {
-      if (!item || typeof item !== "object") return null;
-
-      const source = item as Record<string, unknown>;
-      const id = typeof source.id === "string" && source.id ? source.id : "";
-      const name = typeof source.name === "string" ? source.name.trim() : "";
-
-      if (!id || !name) return null;
-
-      return { id, name };
-    })
-    .filter((member): member is TeamMemberDef => Boolean(member));
-
-  return members.length > 0 ? members : DEFAULT_TEAM_MEMBERS;
 }
 
 function resolveMemberId(value: unknown, teamMembers: TeamMemberDef[]): string | null {
@@ -249,10 +210,21 @@ function resolveSubtasks(value: unknown, teamMembers: TeamMemberDef[]): Subtask[
     .filter((subtask): subtask is Subtask => Boolean(subtask));
 }
 
+function resolveProjectId(value: unknown, projects: { id: string; name: string }[]): string {
+  if (typeof value !== "string" || !value) return "";
+
+  return (
+    projects.find((project) => project.id === value)?.id ??
+    projects.find((project) => project.name === value)?.id ??
+    ""
+  );
+}
+
 export function normalizeTask(
   value: unknown,
   columns: BoardColumnDef[],
   teamMembers: TeamMemberDef[],
+  projects: { id: string; name: string }[] = [],
 ): Task | null {
   if (!value || typeof value !== "object") return null;
 
@@ -276,46 +248,11 @@ export function normalizeTask(
     deadline: typeof source.deadline === "string" ? source.deadline : "",
     stages: resolveStages(source.stages, columns),
     subtasks: resolveSubtasks(rawSubtasks, teamMembers),
+    // Attachments live in Supabase Storage and can't be reconstructed from JSON,
+    // so imported/duplicated tasks always start with none.
+    attachments: [],
     createdAt: typeof source.createdAt === "number" ? source.createdAt : Date.now(),
-  };
-}
-
-export function createSeedTask(columns: BoardColumnDef[], teamMembers: TeamMemberDef[]): Task {
-  const deadline = new Date();
-  deadline.setDate(deadline.getDate() + 30);
-
-  const stages: Record<string, boolean> = {};
-  columns.forEach((column, index) => {
-    stages[column.id] = index === 0;
-  });
-
-  const primaryMember = teamMembers[0]?.id ?? "";
-
-  return {
-    id: generateId(),
-    name: "Automated SEO Topical Authority",
-    client: "Internal",
-    desc: "Build an AI-powered system that writes and publishes daily SEO-optimized blog posts with affiliate link insertion across multiple niche blogs.",
-    column: columns[0]?.id ?? "",
-    assignees: [primaryMember],
-    priority: "High",
-    deadline: deadline.toISOString().split("T")[0],
-    stages,
-    subtasks: [
-      {
-        id: generateId("subtask"),
-        title: "Draft content calendar",
-        done: true,
-        assignee: primaryMember,
-      },
-      {
-        id: generateId("subtask"),
-        title: "Set up publishing pipeline",
-        done: false,
-        assignee: "",
-      },
-    ],
-    createdAt: Date.now(),
+    projectId: resolveProjectId(source.projectId, projects),
   };
 }
 
@@ -388,3 +325,166 @@ export function countCompleteSubtasks(task: Task) {
 export function priorityClass(priority: Priority) {
   return priority.toLowerCase();
 }
+
+export const PROJECT_STATUSES = ["planning", "active", "on_hold", "completed"] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
+export type Project = {
+  id: string;
+  name: string;
+  client: string;
+  description: string;
+  status: ProjectStatus;
+  startDate: string;
+  targetDate: string;
+  createdAt: number;
+};
+
+export function getProjectName(projects: Project[], projectId: string): string {
+  return projects.find((project) => project.id === projectId)?.name ?? "";
+}
+
+export type ProjectChecklistItem = {
+  id: string;
+  title: string;
+  done: boolean;
+};
+
+export type ProjectFeature = ProjectChecklistItem;
+export type ProjectRequirement = ProjectChecklistItem;
+
+export type ProjectResource = {
+  id: string;
+  name: string;
+  cost: number;
+  notes: string;
+};
+
+export function computeProjectCost(resources: ProjectResource[]): number {
+  return resources.reduce((sum, resource) => sum + resource.cost, 0);
+}
+
+export function projectStatusLabel(status: ProjectStatus) {
+  switch (status) {
+    case "on_hold":
+      return "On Hold";
+    case "planning":
+    case "active":
+    case "completed":
+      return status[0].toUpperCase() + status.slice(1);
+    default:
+      return status;
+  }
+}
+
+export const RESOURCE_CATEGORIES = ["software", "hosting", "marketing", "finance", "other"] as const;
+export type ResourceCategory = (typeof RESOURCE_CATEGORIES)[number];
+
+export const BILLING_CYCLES = ["monthly", "yearly", "weekly", "one_time"] as const;
+export type BillingCycle = (typeof BILLING_CYCLES)[number];
+
+export const RESOURCE_STATUSES = ["active", "trial", "cancelled"] as const;
+export type ResourceStatus = (typeof RESOURCE_STATUSES)[number];
+
+export const RESOURCE_RENEWAL_WINDOW_DAYS = 14;
+
+export type WorkspaceResource = {
+  id: string;
+  name: string;
+  category: ResourceCategory;
+  cost: number;
+  billingCycle: BillingCycle;
+  status: ResourceStatus;
+  renewalDate: string;
+  url: string;
+  notes: string;
+  ownerId: string;
+  createdAt: number;
+};
+
+export function resourceCategoryLabel(category: ResourceCategory) {
+  switch (category) {
+    case "software":
+      return "Software";
+    case "hosting":
+      return "Hosting";
+    case "marketing":
+      return "Marketing";
+    case "finance":
+      return "Finance";
+    case "other":
+    default:
+      return "Other";
+  }
+}
+
+export function billingCycleLabel(cycle: BillingCycle) {
+  switch (cycle) {
+    case "monthly":
+      return "Monthly";
+    case "yearly":
+      return "Yearly";
+    case "weekly":
+      return "Weekly";
+    case "one_time":
+    default:
+      return "One-time";
+  }
+}
+
+export function resourceStatusLabel(status: ResourceStatus) {
+  switch (status) {
+    case "trial":
+      return "Trial";
+    case "cancelled":
+      return "Cancelled";
+    case "active":
+    default:
+      return "Active";
+  }
+}
+
+const WEEKS_PER_MONTH = 52 / 12;
+
+export function normalizedMonthlyCost(resource: WorkspaceResource): number {
+  if (resource.status === "cancelled") return 0;
+
+  switch (resource.billingCycle) {
+    case "monthly":
+      return resource.cost;
+    case "yearly":
+      return resource.cost / 12;
+    case "weekly":
+      return resource.cost * WEEKS_PER_MONTH;
+    case "one_time":
+    default:
+      return 0;
+  }
+}
+
+export function computeMonthlySpend(resources: WorkspaceResource[]): number {
+  return resources.reduce((sum, resource) => sum + normalizedMonthlyCost(resource), 0);
+}
+
+export function isRenewalDueSoon(resource: WorkspaceResource): boolean {
+  if (!resource.renewalDate || resource.status === "cancelled") return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const renewal = new Date(`${resource.renewalDate}T00:00:00`);
+  if (Number.isNaN(renewal.getTime())) return false;
+
+  const days = Math.round((renewal.getTime() - today.getTime()) / 86_400_000);
+  return days >= 0 && days <= RESOURCE_RENEWAL_WINDOW_DAYS;
+}
+
+export type ActivityEntityType = "task" | "project" | "column" | "member" | "resource" | "workspace";
+
+export type ActivityEntry = {
+  id: string;
+  actorId: string;
+  actorName: string;
+  entityType: ActivityEntityType;
+  summary: string;
+  createdAt: number;
+};

@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Modal } from "./Modal";
+import { Tooltip } from "./Tooltip";
 import type { BoardColumnDef } from "../lib/tasks";
 
 type ColumnSettingsModalProps = {
@@ -48,9 +49,11 @@ export function ColumnSettingsModal({
               deleted.
             </p>
           </div>
-          <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
+          <Tooltip label="Close">
+            <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
+              <X size={16} />
+            </button>
+          </Tooltip>
         </div>
 
         <ul className="settings-list">
@@ -60,24 +63,28 @@ export function ColumnSettingsModal({
             return (
               <li className="settings-row" key={column.id}>
                 <div className="column-settings-reorder">
-                  <button
-                    className="icon-btn"
-                    type="button"
-                    disabled={index === 0}
-                    onClick={() => onMove(column.id, "up")}
-                    aria-label={`Move ${column.name} up`}
-                  >
-                    <ArrowUp size={13} />
-                  </button>
-                  <button
-                    className="icon-btn"
-                    type="button"
-                    disabled={index === columns.length - 1}
-                    onClick={() => onMove(column.id, "down")}
-                    aria-label={`Move ${column.name} down`}
-                  >
-                    <ArrowDown size={13} />
-                  </button>
+                  <Tooltip label="Move up">
+                    <button
+                      className="icon-btn"
+                      type="button"
+                      disabled={index === 0}
+                      onClick={() => onMove(column.id, "up")}
+                      aria-label={`Move ${column.name} up`}
+                    >
+                      <ArrowUp size={13} />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label="Move down">
+                    <button
+                      className="icon-btn"
+                      type="button"
+                      disabled={index === columns.length - 1}
+                      onClick={() => onMove(column.id, "down")}
+                      aria-label={`Move ${column.name} down`}
+                    >
+                      <ArrowDown size={13} />
+                    </button>
+                  </Tooltip>
                 </div>
 
                 <input
@@ -99,13 +106,8 @@ export function ColumnSettingsModal({
 
                 <span className="settings-count">{count}</span>
 
-                <button
-                  className="icon-btn icon-btn-danger"
-                  type="button"
-                  disabled={count > 0 || columns.length <= 1}
-                  onClick={() => onDelete(column.id)}
-                  aria-label={`Delete ${column.name}`}
-                  title={
+                <Tooltip
+                  label={
                     count > 0
                       ? "Move or delete its cards first"
                       : columns.length <= 1
@@ -113,8 +115,16 @@ export function ColumnSettingsModal({
                         : `Delete ${column.name}`
                   }
                 >
-                  <Trash2 size={13} />
-                </button>
+                  <button
+                    className="icon-btn icon-btn-danger"
+                    type="button"
+                    disabled={count > 0 || columns.length <= 1}
+                    onClick={() => onDelete(column.id)}
+                    aria-label={`Delete ${column.name}`}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </Tooltip>
               </li>
             );
           })}
