@@ -1,4 +1,4 @@
-import { Calendar } from "lucide-react";
+import { Calendar, FolderKanban } from "lucide-react";
 import { memo, type DragEvent } from "react";
 import { PipelineTrack } from "./PipelineTrack";
 import {
@@ -9,10 +9,12 @@ import {
   getAvatarColor,
   getInitials,
   getMemberName,
+  getProjectName,
   isDueSoon,
   isOverdue,
   priorityClass,
   type BoardColumnDef,
+  type Project,
   type Task,
   type TeamMemberDef,
 } from "../lib/tasks";
@@ -29,6 +31,7 @@ type TaskCardProps = {
   task: Task;
   columns: BoardColumnDef[];
   teamMembers: TeamMemberDef[];
+  projects: Project[];
   isDragging: boolean;
   onOpenDetail: (taskId: string) => void;
   onToggleStage: (taskId: string, columnId: string) => void;
@@ -40,6 +43,7 @@ export const TaskCard = memo(function TaskCard({
   task,
   columns,
   teamMembers,
+  projects,
   isDragging,
   onOpenDetail,
   onToggleStage,
@@ -49,6 +53,7 @@ export const TaskCard = memo(function TaskCard({
   const overdue = isOverdue(task, columns);
   const dueSoon = !overdue && isDueSoon(task, columns);
   const doneCount = countCompleteStages(task, columns);
+  const projectName = task.projectId ? getProjectName(projects, task.projectId) : "";
   const visibleAssignees = task.assignees.slice(0, MAX_AVATAR_STACK);
   const overflowCount = task.assignees.length - visibleAssignees.length;
   const primaryName = task.assignees[0]
@@ -76,6 +81,13 @@ export const TaskCard = memo(function TaskCard({
         <span className="card-client">
           Client: <span>{task.client}</span>
         </span>
+
+        {projectName ? (
+          <span className="card-project-chip">
+            <FolderKanban size={11} aria-hidden="true" />
+            {projectName}
+          </span>
+        ) : null}
 
         <span className="card-meta">
           <span className="card-assignee">
