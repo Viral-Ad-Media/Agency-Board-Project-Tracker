@@ -114,9 +114,9 @@ export function AppHeader({
 
         <div className="header-actions">
           <Tooltip label="Replay the product tour" placement="bottom">
-            <button className="btn-ghost" type="button" onClick={onReplayTour}>
+            <button className="btn-ghost" type="button" onClick={onReplayTour} aria-label="Help">
               <CircleHelp size={13} aria-hidden="true" />
-              Help
+              <span className="btn-label">Help</span>
             </button>
           </Tooltip>
           <Tooltip label="Add or remove team members" placement="bottom">
@@ -125,9 +125,10 @@ export function AppHeader({
               type="button"
               data-tour-id="team-btn"
               onClick={onManageTeam}
+              aria-label="Team"
             >
               <Users size={13} aria-hidden="true" />
-              Team
+              <span className="btn-label">Team</span>
             </button>
           </Tooltip>
           <Tooltip label="Rename, reorder, add, or remove columns" placement="bottom">
@@ -136,15 +137,16 @@ export function AppHeader({
               type="button"
               data-tour-id="columns-btn"
               onClick={onManageColumns}
+              aria-label="Columns"
             >
               <Settings size={13} aria-hidden="true" />
-              Columns
+              <span className="btn-label">Columns</span>
             </button>
           </Tooltip>
           <Tooltip label="Download the board as a JSON file" placement="bottom">
-            <button className="btn-ghost" type="button" onClick={onExport}>
+            <button className="btn-ghost" type="button" onClick={onExport} aria-label="Export">
               <Download size={13} aria-hidden="true" />
-              Export
+              <span className="btn-label">Export</span>
             </button>
           </Tooltip>
           <Tooltip label="Restore the board from a JSON file" placement="bottom">
@@ -152,9 +154,10 @@ export function AppHeader({
               className="btn-ghost"
               type="button"
               onClick={() => fileInputRef.current?.click()}
+              aria-label="Import"
             >
               <Upload size={13} aria-hidden="true" />
-              Import
+              <span className="btn-label">Import</span>
             </button>
           </Tooltip>
           <input
@@ -170,9 +173,9 @@ export function AppHeader({
           />
           {onSignOut ? (
             <Tooltip label="Sign out" placement="bottom">
-              <button className="btn-ghost" type="button" onClick={onSignOut}>
+              <button className="btn-ghost" type="button" onClick={onSignOut} aria-label="Sign Out">
                 <LogOut size={13} aria-hidden="true" />
-                Sign Out
+                <span className="btn-label">Sign Out</span>
               </button>
             </Tooltip>
           ) : null}
